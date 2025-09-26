@@ -1,24 +1,20 @@
-import React, { useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useContext, useRef, useState } from 'react';
+import { useRouter } from 'next/router';
+import { AppContext } from '@/pages/_app';
+import NftGallery from '@/components/dashboard/NftGallery';
+import UploadModal from '@/components/dashboard/UploadModal';
+import FullscreenGallery from '@/components/dashboard/FullscreenGallery';
 
-function DashboardPage({ items, setItems, pinataConfig }) {
-  const navigate = useNavigate();
+export default function Dashboard() {
+  const router = useRouter();
+  const { items, setItems, pinataConfig } = useContext(AppContext);
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [showFullscreen, setShowFullscreen] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
 
-  const {
-    jwt,
-    apiKey,
-    apiSecret,
-    groupId,
-    apiVersion,
-    gatewayBase,
-  } = pinataConfig;
-
-  const handleProposeNFT = () => setShowUploadModal(true);
+  const { jwt, apiKey, apiSecret, groupId, apiVersion, gatewayBase } = pinataConfig;
 
   const handleFileChange = async (e) => {
     const files = Array.from(e.target.files || []);
@@ -113,11 +109,9 @@ function DashboardPage({ items, setItems, pinataConfig }) {
     <div className="dashboard-container">
       <div className="dashboard-main">
         <div className="dashboard-left panel">
-          <div className="panel-content">
-            {/* left content placeholder */}
-          </div>
+          <div className="panel-content">{/* left content placeholder */}</div>
           <div className="panel-overlay">
-            <button className="panel-overlay-btn" onClick={() => navigate('/bidding')}>
+            <button className="panel-overlay-btn" onClick={() => router.push('/bidding')}>
               go to bidding page to explore
             </button>
           </div>
@@ -125,25 +119,15 @@ function DashboardPage({ items, setItems, pinataConfig }) {
         <div className="dashboard-right panel">
           <div className="right-header">
             <div className="right-title">proposed nfts</div>
-            <button className="enlarge-button" onClick={() => setShowFullscreen(true)} title="Enlarge">
-              ⤢
-            </button>
+            <button className="enlarge-button" onClick={() => setShowFullscreen(true)} title="Enlarge">⤢</button>
           </div>
           {items.length > 0 ? (
-            <div className="nft-gallery">
-              {items.map((it, idx) => (
-                <div key={idx} className={`nft-thumb-card ${selectedIndex === idx ? 'selected' : ''}`}>
-                  <div className="nft-thumb-frame" onClick={() => setSelectedIndex(idx)}>
-                    <img src={it.url} alt={it.name || `nft-${idx}`} className="nft-thumb-image" />
-                  </div>
-                  {selectedIndex === idx && (
-                    <button className="vote-button" onClick={() => alert(`Vote for ${it.name || 'nft ' + (idx+1)}`)}>
-                      vote
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
+            <NftGallery
+              items={items}
+              selectedIndex={selectedIndex}
+              onSelect={setSelectedIndex}
+              showVote
+            />
           ) : (
             <div className="placeholder-text">no uploads yet</div>
           )}
@@ -157,7 +141,7 @@ function DashboardPage({ items, setItems, pinataConfig }) {
             onChange={handleFileChange}
           />
           <div className="panel-overlay">
-            <button className="panel-overlay-btn" onClick={() => navigate('/voting')}>
+            <button className="panel-overlay-btn" onClick={() => router.push('/voting')}>
               go to voting page to view
             </button>
           </div>
@@ -170,44 +154,20 @@ function DashboardPage({ items, setItems, pinataConfig }) {
       </div>
 
       {showUploadModal && (
-        <div className="modal-backdrop" onClick={() => setShowUploadModal(false)}>
-          <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-title">upload your nft for voting</div>
-            <div className="modal-body">
-              You are about to upload your NFT(s) for community voting. Please select PNG or SVG files.
-            </div>
-            <div className="modal-actions">
-              <button className="modal-btn secondary" onClick={() => setShowUploadModal(false)}>cancel</button>
-              <button className="modal-btn primary" onClick={() => { setShowUploadModal(false); fileInputRef.current && fileInputRef.current.click(); }}>upload files</button>
-            </div>
-          </div>
-        </div>
+        <UploadModal
+          onClose={() => setShowUploadModal(false)}
+          onUploadClick={() => { setShowUploadModal(false); fileInputRef.current && fileInputRef.current.click(); }}
+        />
       )}
 
       {showFullscreen && (
-        <div className="fullscreen-overlay">
-          <div className="fullscreen-topbar">
-            <div className="right-title">proposed nfts</div>
-            <button className="close-button" onClick={() => setShowFullscreen(false)}>close</button>
-          </div>
-          <div className="nft-gallery fullscreen">
-            {items.map((it, idx) => (
-              <div key={idx} className={`nft-thumb-card ${selectedIndex === idx ? 'selected' : ''}`}>
-                <div className="nft-thumb-frame" onClick={() => setSelectedIndex(idx)}>
-                  <img src={it.url} alt={it.name || `nft-${idx}`} className="nft-thumb-image" />
-                </div>
-                {selectedIndex === idx && (
-                  <button className="vote-button" onClick={() => alert(`Vote for ${it.name || 'nft ' + (idx+1)}`)}>
-                    vote
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+        <FullscreenGallery
+          items={items}
+          selectedIndex={selectedIndex}
+          onSelect={setSelectedIndex}
+          onClose={() => setShowFullscreen(false)}
+        />
       )}
     </div>
   );
 }
-
-export default DashboardPage;

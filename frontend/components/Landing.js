@@ -1,20 +1,18 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 
-function LandingPage() {
-  const navigate = useNavigate();
+export default function Landing() {
+  const router = useRouter();
   return (
     <div className="landing-container">
       <div className="content">
         <h1 className="title">worldDao</h1>
         <p className="subtitle">Enter the decentralized future</p>
-        <button className="dive-button" onClick={() => navigate('/dashboard')}>
+        <button className="dive-button" onClick={() => router.push('/dashboard')}>
           dive into worldDao
         </button>
       </div>
-      <div className="background-pattern"></div>
+      <div className="background-pattern" />
     </div>
   );
 }
-
-export default LandingPage;
