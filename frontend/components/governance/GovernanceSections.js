@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getProvider, getCandidateContract, getGovernorContract, getSigner, initMiniKit } from '@/lib/web3';
+import { useAccount } from 'wagmi';
 import { ethers } from 'ethers';
 
 const PROPOSAL_STATES = {
@@ -10,7 +11,8 @@ const PROPOSAL_STATES = {
     4: 'Executed'
 };
 
-export default function GovernanceSections({ userOwnsNFT = false, userAddress = '', walletConnected = false, initialTab = 'candidates' }) {
+export default function GovernanceSections({ userOwnsNFT = false, initialTab = 'candidates' }) {
+    const { address, isConnected } = useAccount();
     const [activeSection, setActiveSection] = useState(initialTab);
     const [candidates, setCandidates] = useState([]);
     const [proposals, setProposals] = useState([]);
@@ -308,17 +310,17 @@ export default function GovernanceSections({ userOwnsNFT = false, userAddress = 
             {/* Content Area */}
             <div className="governance-content">
                 {/* Permission Banner */}
-                {!userAddress && (
+                {!address && (
                     <div className="permission-banner warning">
                         ⚠️ Connect your wallet to interact with governance
                     </div>
                 )}
-                {userAddress && !userOwnsNFT && activeSection === 'candidates' && (
+                {address && !userOwnsNFT && activeSection === 'candidates' && (
                     <div className="permission-banner info">
                         💡 Anyone can create candidates! NFT holders can sponsor and create proposals.
                     </div>
                 )}
-                {userAddress && userOwnsNFT && (
+                {address && userOwnsNFT && (
                     <div className="permission-banner success">
                         ✅ NFT Holder: You can create candidates, sponsor them, and create proposals!
                     </div>
@@ -341,9 +343,9 @@ export default function GovernanceSections({ userOwnsNFT = false, userAddress = 
                                 <button
                                     className="create-btn"
                                     onClick={createCandidate}
-                                    disabled={creating || !newCandidateDescription.trim() || !userAddress}
+                                    disabled={creating || !newCandidateDescription.trim() || !address}
                                 >
-                                    {!userAddress ? 'connect wallet first' : (creating ? 'creating...' : 'create (0.01 eth)')}
+                                    {!address ? 'connect wallet first' : (creating ? 'creating...' : 'create (0.01 eth)')}
                                 </button>
                             </div>
                         </div>

@@ -4,30 +4,28 @@ import { useRouter } from 'next/router';
 import Layout from '@/components/Layout';
 import GovernanceSections from '@/components/governance/GovernanceSections';
 import { initMiniKit, getSigner, checkNFTOwnership } from '@/lib/web3';
+import { useAccount } from 'wagmi';
 
 export default function GovernancePage() {
     const router = useRouter();
     const { tab } = router.query;
+    const { address, isConnected } = useAccount();
     const [activeTab, setActiveTab] = useState('candidates');
     const [userOwnsNFT, setUserOwnsNFT] = useState(false);
-    const [userAddress, setUserAddress] = useState('');
-    const [walletConnected, setWalletConnected] = useState(false);
 
     // Check user permissions
     const checkUserPermissions = async () => {
-        try {
-            const signer = await getSigner();
-            const address = await signer.getAddress();
-            setUserAddress(address);
-            setWalletConnected(true);
+        if (!isConnected || !address) {
+            setUserOwnsNFT(false);
+            return;
+        }
 
+        try {
             const ownsNFT = await checkNFTOwnership(address);
             setUserOwnsNFT(ownsNFT);
         } catch (error) {
-            console.log('User not connected or no NFT:', error.message);
+            console.log('Failed to check NFT ownership:', error.message);
             setUserOwnsNFT(false);
-            setUserAddress('');
-            setWalletConnected(false);
         }
     };
 
@@ -39,10 +37,12 @@ export default function GovernancePage() {
         if (tab === 'candidates' || tab === 'proposals') {
             setActiveTab(tab);
         }
-
-        // Check user permissions on load
-        checkUserPermissions();
     }, [tab]);
+
+    useEffect(() => {
+        // Check user permissions when wallet connection changes
+        checkUserPermissions();
+    }, [isConnected, address]);
 
     return (
         <>
@@ -54,12 +54,15 @@ export default function GovernancePage() {
                 <div className="governance-page-header">
                     <div className="page-title">worldDao governance</div>
                     <div className="page-subtitle">shape the dao's future</div>
-                    <button
-                        className="back-btn"
-                        onClick={() => router.push('/dashboard')}
-                    >
-                        ← back to dashboard
-                    </button>
+                    <div className="header-controls">
+                        <w3m-button />
+                        <button
+                            className="back-btn"
+                            onClick={() => router.push('/dashboard')}
+                        >
+                            ← back to dashboard
+                        </button>
+                    </div>
                 </div>
 
                 <div className="governance-page-tabs">
@@ -80,9 +83,9 @@ export default function GovernancePage() {
                 </div>
 
                 {/* User Status */}
-                {userAddress ? (
+                {isConnected && address ? (
                     <div className="user-status-bar">
-                        <span className="wallet-info">Connected: {userAddress.slice(0, 6)}...{userAddress.slice(-4)}</span>
+                        <span className="wallet-info">Connected: {address.slice(0, 6)}...{address.slice(-4)}</span>
                         {userOwnsNFT ? (
                             <span className="nft-status has-nft">✅ NFT Holder</span>
                         ) : (
@@ -94,10 +97,7 @@ export default function GovernancePage() {
                     </div>
                 ) : (
                     <div className="user-status-bar">
-                        <span className="wallet-info">Not connected</span>
-                        <button className="connect-btn" onClick={checkUserPermissions}>
-                            connect wallet
-                        </button>
+                        <span className="wallet-info">Not connected - use Web3Modal above to connect</span>
                     </div>
                 )}
 
@@ -105,7 +105,6 @@ export default function GovernancePage() {
                     <GovernanceSections
                         initialTab={activeTab}
                         userOwnsNFT={userOwnsNFT}
-                        userAddress={userAddress}
                     />
                 </div>
             </div>
@@ -137,6 +136,13 @@ export default function GovernancePage() {
                         font-size: 0.8rem;
                         color: rgba(255, 255, 255, 0.7);
                         margin-bottom: 20px;
+                    }
+
+                    .header-controls {
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 1rem;
                     }
 
                     .back-btn {

@@ -6,10 +6,12 @@ import UploadModal from '@/components/dashboard/UploadModal';
 import FullscreenGallery from '@/components/dashboard/FullscreenGallery';
 import { useEffect } from 'react';
 import { getProvider, getSigner, getContract } from '@/lib/web3';
+import { useAccount } from 'wagmi';
 
 export default function Dashboard() {
   const router = useRouter();
   const { items, setItems, pinataConfig } = useContext(AppContext);
+  const { address, isConnected } = useAccount();
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [showFullscreen, setShowFullscreen] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -29,6 +31,15 @@ export default function Dashboard() {
       try {
         const provider = getProvider();
         const contract = await getContract(provider);
+
+        // Check if contract is deployed
+        const code = await provider.getCode(contract.target || contract.address);
+        if (code === '0x') {
+          console.log('Voting contract not deployed');
+          setIsVotingOpen(false);
+          return;
+        }
+
         const open = await contract.isVotingOpen();
         setIsVotingOpen(open);
 
@@ -37,6 +48,7 @@ export default function Dashboard() {
         }
       } catch (e) {
         // Wallet not available - that's fine
+        console.log('Contract check failed:', e.message);
         setIsVotingOpen(false);
       }
     } catch (e) {
@@ -171,6 +183,15 @@ export default function Dashboard() {
       try {
         const provider = getProvider();
         const contract = await getContract(provider);
+
+        // Check if contract is deployed and has the method
+        const code = await provider.getCode(contract.target || contract.address);
+        if (code === '0x') {
+          console.log('Contract not deployed at address:', contract.target || contract.address);
+          setIsVotingOpen(false);
+          return;
+        }
+
         const open = await contract.isVotingOpen();
         setIsVotingOpen(open);
 
@@ -190,7 +211,33 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard-container">
+      {/* Wallet Connection Status */}
+      <div className="wallet-status">
+        <w3m-button />
+        {isConnected && <span className="connected-indicator">✓ Connected: {address?.slice(0, 6)}...{address?.slice(-4)}</span>}
+      </div>
+
       <div className="dashboard-main">
+        {/* Auction Section */}
+        <div className="dashboard-section auction-section panel">
+          <div className="section-header">
+            <div className="section-title">🎯 auction house</div>
+            <div className="section-subtitle">bid on exclusive nfts</div>
+          </div>
+          <div className="auction-content">
+            <div className="auction-placeholder">
+              <div className="auction-icon">🏛️</div>
+              <p>live auctions coming soon</p>
+              <p className="small-text">place bids on community favorites</p>
+            </div>
+          </div>
+          <div className="panel-overlay">
+            <button className="panel-overlay-btn" onClick={() => router.push('/bidding')}>
+              go to auction page
+            </button>
+          </div>
+        </div>
+
         {/* NFT Gallery Section */}
         <div className="dashboard-section dashboard-right panel">
           <div className="right-header">
@@ -248,13 +295,22 @@ export default function Dashboard() {
             </button>
           </div>
         </div>
+      </div>
 
-        {/* Governance Section */}
-        <div className="dashboard-section governance-section panel">
-          <div className="governance-header">
-            <div className="governance-title">governance hub</div>
-            <div className="governance-subtitle">shape the dao's future</div>
-          </div>
+      {/* Propose Your Own NFT Section */}
+      <div className="dashboard-section propose-section">
+        <button className="propose-button" onClick={() => setShowUploadModal(true)}>
+          <span className="propose-icon">✨</span>
+          propose your own nft
+          <span className="propose-subtitle">upload your creation to the community</span>
+        </button>
+      </div>
+
+      {/* Governance Section */}
+      <div className="dashboard-section governance-section">
+        <div className="governance-section-content">
+          <div className="governance-title">🏛️ governance hub</div>
+          <div className="governance-subtitle">shape the dao's future</div>
           <div className="governance-options">
             <div
               className="governance-option candidate-option"
@@ -284,43 +340,6 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-      <div className="dashboard-bottom">
-        <button className="propose-button" onClick={() => setShowUploadModal(true)}>
-          propose your own nft
-        </button>
-      </div>
-
-      {/* Governance Section */}
-      <div className="governance-section">
-        <div className="governance-section-content">
-          <div className="governance-title">🏛️ worldDao governance</div>
-          <div className="governance-subtitle">shape the future of our community</div>
-          <div className="governance-options">
-            <div
-              className="governance-option candidate-option"
-              onClick={() => router.push('/governance?tab=candidates')}
-            >
-              <div className="option-icon">💡</div>
-              <div className="option-content">
-                <div className="option-title">suggest idea</div>
-                <div className="option-desc">anyone can create candidates</div>
-              </div>
-            </div>
-            <div
-              className="governance-option proposal-option"
-              onClick={() => router.push('/governance?tab=proposals')}
-            >
-              <div className="option-icon">🗳️</div>
-              <div className="option-content">
-                <div className="option-title">vote & propose</div>
-                <div className="option-desc">nft holders participate</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-
 
       {showUploadModal && (
         <UploadModal

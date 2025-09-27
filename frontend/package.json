@@ -9,11 +9,15 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.90.2",
+    "@web3modal/wagmi": "^5.1.11",
     "@worldcoin/minikit-js": "^1.9.6",
     "ethers": "^6.15.0",
     "next": "15.5.4",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "viem": "^2.37.8",
+    "wagmi": "^2.17.5"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

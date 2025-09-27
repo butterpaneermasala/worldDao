@@ -1,5 +1,7 @@
 import { ethers } from "ethers";
 import { MiniKit } from '@worldcoin/minikit-js';
+import { getAccount, getWalletClient } from '@wagmi/core';
+import { config } from './web3modal';
 
 // Initialize MiniKit for World App integration
 export const initMiniKit = () => {
@@ -17,6 +19,16 @@ export const initMiniKit = () => {
 
 export function getProvider() {
   if (typeof window !== "undefined") {
+    // Check if Web3Modal is connected
+    try {
+      const account = getAccount(config);
+      if (account.isConnected && window.ethereum) {
+        return new ethers.BrowserProvider(window.ethereum);
+      }
+    } catch (error) {
+      // Fall through to legacy provider detection
+    }
+
     // Prioritize World App (MiniKit) if available
     if (window.ethereum?.isMiniKit) {
       return new ethers.BrowserProvider(window.ethereum);
@@ -26,11 +38,26 @@ export function getProvider() {
       return new ethers.BrowserProvider(window.ethereum);
     }
   }
-  throw new Error("No web3 provider found. Please use World App or connect a wallet.");
+  throw new Error("No web3 provider found. Please connect a wallet using Web3Modal or World App.");
 }
 
 export async function getSigner() {
   try {
+    // Try Web3Modal first
+    try {
+      const account = getAccount(config);
+      if (account.isConnected) {
+        const walletClient = await getWalletClient(config);
+        if (walletClient) {
+          // Convert wagmi client to ethers signer
+          const provider = getProvider();
+          return await provider.getSigner();
+        }
+      }
+    } catch (error) {
+      console.log('Web3Modal not connected, falling back to legacy provider');
+    }
+
     const provider = getProvider();
 
     // Check if already connected first
@@ -51,7 +78,7 @@ export async function getSigner() {
     return await provider.getSigner();
   } catch (error) {
     console.error("Error getting signer:", error);
-    throw new Error("Please connect your wallet and switch to World Chain");
+    throw new Error("Please connect your wallet using Web3Modal and switch to World Chain");
   }
 }
 
@@ -121,11 +148,26 @@ export async function getWorldNFTContract(signerOrProvider) {
 export async function checkNFTOwnership(userAddress) {
   try {
     const provider = getProvider();
+
+    // First check if the contract is deployed
+    const nftAddress = process.env.NEXT_PUBLIC_WORLD_NFT_ADDRESS;
+    if (!nftAddress) {
+      console.log("NFT contract address not configured");
+      return false;
+    }
+
+    const code = await provider.getCode(nftAddress);
+    if (code === '0x') {
+      console.log("NFT contract not deployed at address:", nftAddress);
+      return false;
+    }
+
     const nftContract = await getWorldNFTContract(provider);
     const balance = await nftContract.balanceOf(userAddress);
     return Number(balance) > 0;
   } catch (error) {
     console.error("Failed to check NFT ownership:", error);
+    // For development, return false instead of throwing
     return false;
   }
 }

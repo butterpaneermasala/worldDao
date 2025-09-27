@@ -2,10 +2,11 @@ import '@/styles/globals.css'
 import '@/styles/worlddao.css'
 
 import React, { createContext, useMemo, useState } from 'react';
+import { Web3ModalProvider } from '@/lib/web3modal';
 
 export const AppContext = createContext({
   items: [],
-  setItems: () => {},
+  setItems: () => { },
   pinataConfig: {
     jwt: '',
     apiKey: '',
@@ -34,8 +35,10 @@ export default function App({ Component, pageProps }) {
   }), []);
 
   return (
-    <AppContext.Provider value={{ items, setItems, pinataConfig }}>
-      <Component {...pageProps} />
-    </AppContext.Provider>
+    <Web3ModalProvider>
+      <AppContext.Provider value={{ items, setItems, pinataConfig }}>
+        <Component {...pageProps} />
+      </AppContext.Provider>
+    </Web3ModalProvider>
   );
 }
