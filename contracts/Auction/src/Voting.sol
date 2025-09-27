@@ -8,183 +8,219 @@ import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Recei
 import {NFTAuction} from "./NFTAuction.sol";
 
 contract Voting is AutomationCompatibleInterface, IERC721Receiver {
-    // IST offset = 5h30m = 19,800 seconds
-    uint256 private constant IST_OFFSET = 19800;
-    uint256 private constant CANDIDATE_COUNT = 20;
+    // --- Proposal model (stored per session) ---
+    struct Proposal {
+        string tokenURI;     // ipfs://CID or gateway URL (for discovery/cleanup)
+        string svgBase64;    // raw base64 SVG (minted on-chain as data URI)
+        address proposer;
+        uint256 votes;
+        uint256 lastVoteTimestamp; // for tie-break: earliest last vote wins
+    }
 
-    // Candidate data
-    string[20] public candidatePngs;
-    uint256[20] public votes;
-    uint256[20] public lastVoteTimestamp; // last vote time for each candidate, used for tie-break
+    /// @notice Local-dev helper: change phase durations only on Anvil/Hardhat (chainid 31337)
+    /// Can only be called while in Uploading phase to avoid mid-phase inconsistencies.
+    function setDurations(uint256 _upload, uint256 _voting, uint256 _bidding) external {
+        require(block.chainid == 31337, "only local");
+        require(currentPhase == Phase.Uploading || phaseEnd == 0, "must be uploading");
+        require(_upload > 0 && _voting > 0 && _bidding > 0, "durations");
+        uploadDuration = _upload;
+        votingDuration = _voting;
+        biddingDuration = _bidding;
+        // if currently in Uploading, extend phaseEnd relative to now to reflect new duration
+        if (currentPhase == Phase.Uploading) {
+            phaseEnd = block.timestamp + uploadDuration;
+            emit PhaseChanged(currentPhase, phaseEnd);
+        }
+    }
 
-    // Voting limits
-    // Stores the IST day index a voter last voted in, to enforce one vote per address per day
-    mapping(address => uint256) public lastVotedDayIndex;
+    Proposal[] public proposals;
+    
+    // --- Phases ---
+    enum Phase { Uploading, Voting, Bidding }
+    Phase public currentPhase;
+    uint256 public phaseEnd; // UTC timestamp for end of current phase
 
-    // Day window aligned to IST
-    // UTC timestamp for the start of the current IST day (00:00:00 IST)
-    uint256 public currentDayStartIST;
+    // durations (seconds) — default 1 day each; configurable only on local dev chain
+    uint256 public uploadDuration = 1 days;
+    uint256 public votingDuration = 1 days;
+    uint256 public biddingDuration = 1 days;
+
+    // Voting limits: one vote per address per voting session
+    uint256 public voteSessionId;
+    mapping(address => uint256) public lastVotedSession;
+
+    // Admin retained but not used for gating (no admin role required now)
+    address public admin;
 
     // Minter used to mint the winning NFT to this contract
     NFTMinter public immutable minter;
     // Auction contract that will auction the freshly minted NFT
     NFTAuction public immutable auction;
 
-    // Events
-    event Voted(
-        address indexed voter,
-        uint256 indexed candidateId,
-        uint256 timestamp
-    );
-    event Finalized(
-        uint256 indexed dayIndex,
-        uint256 indexed winningCandidateId,
-        uint256 winningVotes,
-        uint256 tokenId
-    );
-    event DayStarted(uint256 currentDayStartIST);
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Not admin");
+        _;
+    }
 
-    constructor(NFTMinter _minter, NFTAuction _auction, string[20] memory _candidatePngs) {
+    // Events
+    event ProposalSubmitted(uint256 indexed index, address indexed proposer, string tokenURI);
+    event VotingOpened(uint256 startTime, uint256 endTime, uint256 proposalsCount);
+    event Voted(address indexed voter, uint256 indexed proposalId, uint256 timestamp);
+    event Finalized(uint256 indexed dayIndex, uint256 indexed winningProposalId, uint256 winningVotes, uint256 tokenId, string winningTokenURI);
+    event PhaseChanged(Phase phase, uint256 phaseEnd);
+
+    /// @notice Constructor (legacy-compatible): accepts 20 base64 strings to seed proposals immediately.
+    /// Admin is set to deployer (msg.sender). If seeds provided, start in Voting phase for 1 day; otherwise start Uploading for 1 day.
+    constructor(NFTMinter _minter, NFTAuction _auction, string[20] memory _candidateBase64) {
         minter = _minter;
         auction = _auction;
-        for (uint256 i = 0; i < CANDIDATE_COUNT; i++) {
-            candidatePngs[i] = _candidatePngs[i];
+        admin = msg.sender;
+        // Seed proposals from the provided array (only non-empty)
+        for (uint256 i = 0; i < 20; i++) {
+            if (bytes(_candidateBase64[i]).length > 0) {
+                proposals.push(Proposal({
+                    tokenURI: "",
+                    svgBase64: _candidateBase64[i],
+                    proposer: address(0),
+                    votes: 0,
+                    lastVoteTimestamp: 0
+                }));
+            }
         }
-        currentDayStartIST = _computeDayStartIST(block.timestamp);
-        emit DayStarted(currentDayStartIST);
+        if (proposals.length > 0) {
+            // Start directly in Voting phase for one day
+            currentPhase = Phase.Voting;
+            phaseEnd = block.timestamp + votingDuration;
+            // new session id for voting
+            voteSessionId += 1;
+            emit VotingOpened(block.timestamp, phaseEnd, proposals.length);
+            emit PhaseChanged(currentPhase, phaseEnd);
+        } else {
+            // No seeds; start Uploading phase for one day
+            currentPhase = Phase.Uploading;
+            phaseEnd = block.timestamp + uploadDuration;
+            emit PhaseChanged(currentPhase, phaseEnd);
+        }
     }
 
     // --- Public read helpers ---
+    function isVotingOpen() public view returns (bool) { return currentPhase == Phase.Voting && block.timestamp < phaseEnd; }
+    function currentDayIndex() public view returns (uint256) { return 0; } // deprecated; kept for ABI compat, no longer meaningful
+    function currentPhaseInfo() external view returns (Phase phase, uint256 endTime) { return (currentPhase, phaseEnd); }
+    /// @notice Legacy-compatible end-of-day getter used by older tests; now returns current phaseEnd
+    function currentDayEndIST() external view returns (uint256) { return phaseEnd; }
 
-    function currentDayEndIST() public view returns (uint256) {
-        return currentDayStartIST + 1 days;
+    // --- Proposals lifecycle ---
+    /// @notice Submit a proposal (off-chain upload to Pinata first). Hidden until voting is opened.
+    /// @param tokenURI ipfs:// or https gateway URL
+    /// @param svgBase64 raw base64 SVG content (without data URI prefix)
+    function propose(string calldata tokenURI, string calldata svgBase64) external {
+        require(currentPhase == Phase.Uploading, "Not in uploading phase");
+        require(bytes(svgBase64).length > 0, "svg required");
+        proposals.push(Proposal({ tokenURI: tokenURI, svgBase64: svgBase64, proposer: msg.sender, votes: 0, lastVoteTimestamp: 0 }));
+        emit ProposalSubmitted(proposals.length - 1, msg.sender, tokenURI);
     }
 
-    // --- Status helpers ---
-    /// @notice Returns true if voting for the current IST day is still open (now < currentDayEndIST)
-    function isVotingOpen() public view returns (bool) {
-        return block.timestamp < currentDayEndIST();
-    }
-
-    /// @notice Returns true if voting for the current IST day has closed (now >= currentDayEndIST)
-    function hasVotingClosed() public view returns (bool) {
-        return block.timestamp >= currentDayEndIST();
-    }
-
-    /// @notice Returns the start and end timestamps (UTC) of the current IST day window
-    function currentDayWindow() public view returns (uint256 startIST, uint256 endIST) {
-        startIST = currentDayStartIST;
-        endIST = currentDayEndIST();
-    }
-
-    // Current IST day index based on block.timestamp
-    function currentDayIndex() public view returns (uint256) {
-        uint256 shifted = block.timestamp + IST_OFFSET;
-        return shifted / 1 days;
-    }
+    // openVoting removed — transitions are automatic via Automation
 
     // --- Voting ---
 
-    function vote(uint256 candidateId) external {
-        require(candidateId < CANDIDATE_COUNT, "Invalid candidate");
-        require(
-            block.timestamp < currentDayEndIST(),
-            "Voting closed for today"
-        );
-
-        uint256 dayIdx = currentDayIndex();
-        require(lastVotedDayIndex[msg.sender] < dayIdx, "Already voted today");
-
-        // Record vote
-        lastVotedDayIndex[msg.sender] = dayIdx;
-        votes[candidateId] += 1;
-        // Update last vote timestamp for tie-break logic
-        lastVoteTimestamp[candidateId] = block.timestamp;
-
-        emit Voted(msg.sender, candidateId, block.timestamp);
+    function vote(uint256 proposalId) external {
+        require(currentPhase == Phase.Voting && block.timestamp < phaseEnd, "Voting closed");
+        require(proposalId < proposals.length, "Bad id");
+        require(lastVotedSession[msg.sender] < voteSessionId, "Already voted this session");
+        lastVotedSession[msg.sender] = voteSessionId;
+        Proposal storage p = proposals[proposalId];
+        p.votes += 1;
+        p.lastVoteTimestamp = block.timestamp;
+        emit Voted(msg.sender, proposalId, block.timestamp);
     }
 
     // --- Chainlink Automation ---
 
-    function checkUpkeep(
-        bytes calldata /*checkData*/
-    )
-        external
-        view
-        override
-        returns (bool upkeepNeeded, bytes memory /*performData*/)
-    {
-        upkeepNeeded = (block.timestamp >= currentDayEndIST());
+    function checkUpkeep(bytes calldata) external view override returns (bool upkeepNeeded, bytes memory performData) {
+        upkeepNeeded = (block.timestamp >= phaseEnd);
+        performData = bytes("");
     }
 
-    function performUpkeep(bytes calldata /*performData*/) external override {
-        require(block.timestamp >= currentDayEndIST(), "Upkeep not needed");
+    function performUpkeep(bytes calldata) external override {
+        require(block.timestamp >= phaseEnd, "Upkeep not needed");
 
-        // Determine the winner:
-        // - Highest vote count wins
-        // - Tie-breaker: first to reach the highest count (earliest lastVoteTimestamp among tied leaders)
-        uint256 winningId = 0;
-        uint256 maxVotes = votes[0];
-        uint256 earliestLastTs = lastVoteTimestamp[0];
+        if (currentPhase == Phase.Uploading) {
+            if (proposals.length == 0) {
+                // extend uploading until at least one proposal exists
+                phaseEnd = block.timestamp + uploadDuration;
+                emit PhaseChanged(currentPhase, phaseEnd);
+                return;
+            }
+            // move to Voting phase
+            currentPhase = Phase.Voting;
+            phaseEnd = block.timestamp + votingDuration;
+            voteSessionId += 1;
+            emit VotingOpened(block.timestamp, phaseEnd, proposals.length);
+            emit PhaseChanged(currentPhase, phaseEnd);
+            return;
+        }
 
-        // Per your note, zero-vote days won't occur.
-        for (uint256 i = 1; i < CANDIDATE_COUNT; i++) {
-            uint256 v = votes[i];
-            if (v > maxVotes) {
-                maxVotes = v;
-                winningId = i;
-                earliestLastTs = lastVoteTimestamp[i];
-            } else if (v == maxVotes) {
-                // Among ties, the one with the EARLIEST lastVoteTimestamp reached that count first
-                if (
-                    lastVoteTimestamp[i] != 0 &&
-                    lastVoteTimestamp[i] < earliestLastTs
-                ) {
+        if (currentPhase == Phase.Voting) {
+            // Determine the winner among proposals
+            require(proposals.length > 0, "No proposals");
+            uint256 winningId = 0;
+            uint256 maxVotes = proposals[0].votes;
+            uint256 earliestLastTs = proposals[0].lastVoteTimestamp;
+            for (uint256 i = 1; i < proposals.length; i++) {
+                Proposal storage p = proposals[i];
+                if (p.votes > maxVotes) {
+                    maxVotes = p.votes;
                     winningId = i;
-                    earliestLastTs = lastVoteTimestamp[i];
+                    earliestLastTs = p.lastVoteTimestamp;
+                } else if (p.votes == maxVotes) {
+                    if (p.lastVoteTimestamp != 0 && p.lastVoteTimestamp < earliestLastTs) {
+                        winningId = i;
+                        earliestLastTs = p.lastVoteTimestamp;
+                    }
                 }
             }
+
+            // Mint the NFT to this contract using raw SVG base64
+            uint256 tokenId = minter.mintWithSVG(address(this), proposals[winningId].svgBase64);
+            emit Finalized(0, winningId, maxVotes, tokenId, proposals[winningId].tokenURI);
+
+            // Transfer NFT to the auction and start the auction for biddingDuration
+            IERC721(address(minter)).safeTransferFrom(address(this), address(auction), tokenId);
+            uint256 auctionEnd = block.timestamp + biddingDuration;
+            auction.startAuction(address(minter), tokenId, auctionEnd);
+
+            // Move to Bidding phase
+            currentPhase = Phase.Bidding;
+            phaseEnd = auctionEnd; // equal to bidding end
+            emit PhaseChanged(currentPhase, phaseEnd);
+            return;
         }
 
-        // Mint the NFT to this contract
-        uint256 tokenId = minter.mintWithSVG(address(this), candidatePngs[winningId]);
-
-        // IST day index for event purposes is based on the day we just finalized
-        uint256 dayIndex = (currentDayStartIST + IST_OFFSET) / 1 days;
-        emit Finalized(dayIndex, winningId, maxVotes, tokenId);
-
-        // Reset daily tallies for next day
-        for (uint256 i = 0; i < CANDIDATE_COUNT; i++) {
-            votes[i] = 0;
-            lastVoteTimestamp[i] = 0;
+        if (currentPhase == Phase.Bidding) {
+            // Reset proposals and move back to Uploading phase
+            delete proposals;
+            currentPhase = Phase.Uploading;
+            phaseEnd = block.timestamp + uploadDuration;
+            emit PhaseChanged(currentPhase, phaseEnd);
+            return;
         }
-
-        // Roll forward to next IST day
-        uint256 nextDayStart = currentDayStartIST + 1 days;
-        currentDayStartIST = nextDayStart;
-        emit DayStarted(currentDayStartIST);
-
-        // Immediately transfer the freshly minted NFT to the auction and start the auction
-        // Auction runs for the next IST day and will end at nextDayStart + 1 days
-        IERC721(address(minter)).safeTransferFrom(address(this), address(auction), tokenId);
-        uint256 auctionEnd = nextDayStart + 1 days;
-        auction.startAuction(address(minter), tokenId, auctionEnd);
-    }
-
-    // --- Internal time helpers ---
-
-    function _computeDayStartIST(uint256 ts) internal pure returns (uint256) {
-        uint256 shifted = ts + IST_OFFSET;
-        return shifted - (shifted % 1 days) - IST_OFFSET;
     }
 
     // --- ERC721 Receiver ---
-    function onERC721Received(
-        address,
-        address,
-        uint256,
-        bytes calldata
-    ) external pure override returns (bytes4) {
+    function onERC721Received(address, address, uint256, bytes calldata) external pure override returns (bytes4) {
         return IERC721Receiver.onERC721Received.selector;
+    }
+
+    /// @notice Backward-compatible getter for tests expecting `votes(uint256)` on contract
+    function votes(uint256 idx) external view returns (uint256) {
+        require(idx < proposals.length, "idx");
+        return proposals[idx].votes;
+    }
+
+    /// @notice Number of proposals in the current session
+    function proposalsCount() external view returns (uint256) {
+        return proposals.length;
     }
 }

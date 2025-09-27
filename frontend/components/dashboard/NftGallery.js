@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function NftGallery({ items, selectedIndex, onSelect, showVote }) {
+export default function NftGallery({ items, selectedIndex, onSelect, showVote, onVote }) {
   return (
     <div className="nft-gallery">
       {items.map((it, idx) => (
@@ -9,7 +9,7 @@ export default function NftGallery({ items, selectedIndex, onSelect, showVote })
             <img src={it.url} alt={it.name || `nft-${idx}`} className="nft-thumb-image" />
           </div>
           {showVote && selectedIndex === idx && (
-            <button className="vote-button" onClick={() => alert(`Vote for ${it.name || 'nft ' + (idx+1)}`)}>
+            <button className="vote-button" onClick={() => onVote && onVote(idx)}>
               vote
             </button>
           )}

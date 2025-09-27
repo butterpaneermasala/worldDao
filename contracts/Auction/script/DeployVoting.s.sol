@@ -11,22 +11,18 @@ contract DeployVoting is Script {
     string constant NAME = "DailyNFT";
     string constant SYMBOL = "DNFT";
 
-    // Fill your 20 Base64 PNG strings below before broadcasting.
-    // Example: "iVBORw0KGgoAAAANSUhEUgAA..." (without the data-uri prefix)
-    function _candidatePngs() internal pure returns (string[20] memory arr) {
-        // TODO: Replace with your actual base64 PNGs
-        for (uint256 i = 0; i < 20; i++) {
-            arr[i] = ""; // placeholder
-        }
-    }
-
     function run() external {
-        // Private key should be provided via env var: 
-        // export PRIVATE_KEY=0x...
-        uint256 deployerPk = vm.envUint("PRIVATE_KEY");
-        address deployer = vm.addr(deployerPk);
-
-        vm.startBroadcast(deployerPk);
+        // Use PRIVATE_KEY if provided; otherwise rely on --sender/--unlocked and startBroadcast() without args
+        address deployer;
+        try vm.envUint("PRIVATE_KEY") returns (uint256 deployerPk) {
+            deployer = vm.addr(deployerPk);
+            vm.startBroadcast(deployerPk);
+        } catch {
+            // No PRIVATE_KEY in env; use CLI --sender with unlocked account
+            // Note: vm.startBroadcast() without args picks up broadcaster from the CLI context
+            vm.startBroadcast();
+            deployer = tx.origin;
+        }
 
         // 1) Deploy NFTMinter with initialOwner set to deployer (EOA)
         NFTMinter minter = new NFTMinter(NAME, SYMBOL, deployer);
@@ -34,9 +30,12 @@ contract DeployVoting is Script {
         // 2) Deploy NFTAuction with temporary operator = deployer; beneficiary = deployer (adjust if needed)
         NFTAuction auction = new NFTAuction(deployer, payable(deployer));
 
-        // 3) Deploy Voting with the minter, auction, and 20 candidate PNGs
-        string[20] memory pngs = _candidatePngs();
-        Voting voting = new Voting(minter, auction, pngs);
+        // 3) Deploy Voting with the minter, auction, and 20 initial base64 strings (empty by default)
+        string[20] memory emptyPngs;
+        for (uint256 i = 0; i < 20; i++) {
+            emptyPngs[i] = "";
+        }
+        Voting voting = new Voting(minter, auction, emptyPngs);
 
         // 4) Transfer ownership of the minter to Voting so it can mint
         minter.transferOwnership(address(voting));

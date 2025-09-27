@@ -1,0 +1,85 @@
+[
+  {
+    "type": "function",
+    "name": "isVotingOpen",
+    "stateMutability": "view",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "bool" }]
+  },
+  {
+    "type": "function",
+    "name": "currentDayIndex",
+    "stateMutability": "view",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "uint256" }]
+  },
+  {
+    "type": "function",
+    "name": "proposalsCount",
+    "stateMutability": "view",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "uint256" }]
+  },
+  {
+    "type": "function",
+    "name": "proposals",
+    "stateMutability": "view",
+    "inputs": [{ "name": "", "type": "uint256" }],
+    "outputs": [
+      { "name": "tokenURI", "type": "string" },
+      { "name": "svgBase64", "type": "string" },
+      { "name": "proposer", "type": "address" },
+      { "name": "votes", "type": "uint256" },
+      { "name": "lastVoteTimestamp", "type": "uint256" }
+    ]
+  },
+  {
+    "type": "function",
+    "name": "propose",
+    "stateMutability": "nonpayable",
+    "inputs": [
+      { "name": "tokenURI", "type": "string" },
+      { "name": "svgBase64", "type": "string" }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "vote",
+    "stateMutability": "nonpayable",
+    "inputs": [{ "name": "proposalId", "type": "uint256" }],
+    "outputs": []
+  },
+  {
+    "type": "event",
+    "name": "Finalized",
+    "inputs": [
+      { "name": "dayIndex", "type": "uint256", "indexed": true },
+      { "name": "winningProposalId", "type": "uint256", "indexed": true },
+      { "name": "winningVotes", "type": "uint256", "indexed": false },
+      { "name": "tokenId", "type": "uint256", "indexed": false },
+      { "name": "winningTokenURI", "type": "string", "indexed": false }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ProposalSubmitted",
+    "inputs": [
+      { "name": "index", "type": "uint256", "indexed": true },
+      { "name": "proposer", "type": "address", "indexed": true },
+      { "name": "tokenURI", "type": "string", "indexed": false }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "VotingOpened",
+    "inputs": [
+      { "name": "startIST", "type": "uint256", "indexed": false },
+      { "name": "endIST", "type": "uint256", "indexed": false },
+      { "name": "proposalsCount", "type": "uint256", "indexed": false }
+    ],
+    "anonymous": false
+  }
+]

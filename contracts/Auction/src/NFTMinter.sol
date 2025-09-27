@@ -26,4 +26,15 @@ contract NFTMinter is ERC721URIStorage, Ownable {
         string memory uri = string.concat("data:image/svg+xml;base64,", svgBase64);
         _setTokenURI(tokenId, uri);
     }
+
+    /// @dev Mints an NFT to `to` with a provided tokenURI (e.g., ipfs://CID or https gateway URL)
+    /// @param to Recipient address
+    /// @param tokenURI_ The full tokenURI to set
+    /// @return tokenId Newly minted token id
+    function mintWithTokenURI(address to, string calldata tokenURI_) external onlyOwner returns (uint256 tokenId) {
+        tokenId = _nextTokenId;
+        _nextTokenId = tokenId + 1;
+        _safeMint(to, tokenId);
+        _setTokenURI(tokenId, tokenURI_);
+    }
 }

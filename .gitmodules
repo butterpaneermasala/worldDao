@@ -1,0 +1,9 @@
+[submodule "contracts/Auction/lib/openzeppelin-contracts"]
+	path = contracts/Auction/lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+[submodule "contracts/Auction/lib/chainlink-brownie-contracts"]
+	path = contracts/Auction/lib/chainlink-brownie-contracts
+	url = https://github.com/smartcontractkit/chainlink-brownie-contracts
+[submodule "contracts/Auction/lib/forge-std"]
+	path = contracts/Auction/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
