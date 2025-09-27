@@ -24,7 +24,6 @@ contract DeployVoting is Script {
             deployer = tx.origin;
         }
 
-        // 1) Deploy NFTMinter with initialOwner set to deployer (EOA)
         NFTMinter minter = new NFTMinter(NAME, SYMBOL, deployer);
 
         // 2) Deploy NFTAuction with temporary operator = deployer; beneficiary = deployer (adjust if needed)
@@ -37,17 +36,36 @@ contract DeployVoting is Script {
         }
         Voting voting = new Voting(minter, auction, emptyPngs);
 
+        // 3.5) Set custom durations after deployment (only works on local chain)
+        uint256 uploadDur = vm.envUint("UPLOAD_DURATION") > 0 ? vm.envUint("UPLOAD_DURATION") : 1 days;
+        uint256 votingDur = vm.envUint("VOTING_DURATION") > 0 ? vm.envUint("VOTING_DURATION") : 1 days;
+        uint256 biddingDur = vm.envUint("BIDDING_DURATION") > 0 ? vm.envUint("BIDDING_DURATION") : 1 days;
+        voting.setDurations(uploadDur, votingDur, biddingDur);
+
+        // 3.6) Set operator (relayer) for off-chain finalization
+        address relayer;
+        try vm.envAddress("RELAYER_ADDRESS") returns (address r) {
+            relayer = r;
+        } catch {
+            try vm.envUint("RELAYER_PRIVATE_KEY") returns (uint256 relayerPk) {
+                relayer = vm.addr(relayerPk);
+            } catch {
+                relayer = deployer; // fallback
+            }
+        }
+        voting.setOperator(relayer);
+
         // 4) Transfer ownership of the minter to Voting so it can mint
         minter.transferOwnership(address(voting));
 
         // 5) Set the auction operator to Voting so it can start auctions after finalization
         auction.setOperator(address(voting));
-
         vm.stopBroadcast();
 
         console2.log("Deployer:", deployer);
         console2.log("NFTMinter:", address(minter));
         console2.log("NFTAuction:", address(auction));
         console2.log("Voting:", address(voting));
+        console2.log("Relayer (operator):", relayer);
     }
 }
