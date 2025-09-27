@@ -191,15 +191,8 @@ export default function Dashboard() {
   return (
     <div className="dashboard-container">
       <div className="dashboard-main">
-        <div className="dashboard-left panel">
-          <div className="panel-content">{/* left content placeholder */}</div>
-          <div className="panel-overlay">
-            <button className="panel-overlay-btn" onClick={() => router.push('/bidding')}>
-              go to bidding page to explore
-            </button>
-          </div>
-        </div>
-        <div className="dashboard-right panel">
+        {/* NFT Gallery Section */}
+        <div className="dashboard-section dashboard-right panel">
           <div className="right-header">
             <div className="right-title">proposed nfts</div>
             <div className="header-buttons">
@@ -255,12 +248,79 @@ export default function Dashboard() {
             </button>
           </div>
         </div>
+
+        {/* Governance Section */}
+        <div className="dashboard-section governance-section panel">
+          <div className="governance-header">
+            <div className="governance-title">governance hub</div>
+            <div className="governance-subtitle">shape the dao's future</div>
+          </div>
+          <div className="governance-options">
+            <div
+              className="governance-option candidate-option"
+              onClick={() => router.push('/governance?tab=candidates')}
+            >
+              <div className="option-icon">💡</div>
+              <div className="option-content">
+                <div className="option-title">suggest ideas</div>
+                <div className="option-desc">anyone can create candidates</div>
+              </div>
+            </div>
+            <div
+              className="governance-option proposal-option"
+              onClick={() => router.push('/governance?tab=proposals')}
+            >
+              <div className="option-icon">🗳️</div>
+              <div className="option-content">
+                <div className="option-title">vote & propose</div>
+                <div className="option-desc">nft holders participate</div>
+              </div>
+            </div>
+          </div>
+          <div className="panel-overlay">
+            <button className="panel-overlay-btn" onClick={() => router.push('/governance')}>
+              go to governance page
+            </button>
+          </div>
+        </div>
       </div>
       <div className="dashboard-bottom">
         <button className="propose-button" onClick={() => setShowUploadModal(true)}>
           propose your own nft
         </button>
       </div>
+
+      {/* Governance Section */}
+      <div className="governance-section">
+        <div className="governance-section-content">
+          <div className="governance-title">🏛️ worldDao governance</div>
+          <div className="governance-subtitle">shape the future of our community</div>
+          <div className="governance-options">
+            <div
+              className="governance-option candidate-option"
+              onClick={() => router.push('/governance?tab=candidates')}
+            >
+              <div className="option-icon">💡</div>
+              <div className="option-content">
+                <div className="option-title">suggest idea</div>
+                <div className="option-desc">anyone can create candidates</div>
+              </div>
+            </div>
+            <div
+              className="governance-option proposal-option"
+              onClick={() => router.push('/governance?tab=proposals')}
+            >
+              <div className="option-icon">🗳️</div>
+              <div className="option-content">
+                <div className="option-title">vote & propose</div>
+                <div className="option-desc">nft holders participate</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
 
       {showUploadModal && (
         <UploadModal
