@@ -1,0 +1,19 @@
+{
+  "network": "worldchainSepolia",
+  "chainId": "4801",
+  "deployer": "0xe5eeD1EE1535a0DF01E0fE744C6156324D7De975",
+  "timestamp": "2025-09-27T10:01:52.853Z",
+  "blockNumber": 19209944,
+  "contracts": {
+    "newCandidateContract": "0xB28Ba0b7c34832528154ce4a7AcC12b08A004d5D",
+    "oldCandidateContract": "0x83F56281aAbaa37a228B77561f0703A996AB6aD5",
+    "worldChainGovernor": "0x627e9A7DF8e3860B14B95cf7Cf0D7eE120163dD8",
+    "treasury": "0x09D96fCC17b16752ec3673Ea85B9a6fea697f697",
+    "worldNFT": "0x5BCAEf9a3059340f39e640875fE803422b5100C8"
+  },
+  "configuration": {
+    "sponsorThreshold": "3"
+  },
+  "transactionHash": "0x21b9d7eea992981ff3c54fc6773728ade74ae851cc4182c921b659d5d0496b68",
+  "gasUsed": "800694"
+}
