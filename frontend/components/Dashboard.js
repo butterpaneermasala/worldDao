@@ -130,89 +130,42 @@ export default function Dashboard() {
       return;
     }
 
-    if (!jwt && !(apiKey && apiSecret)) {
-      alert('Missing Pinata credentials. Provide JWT (recommended) or API key/secret in .env');
-      e.target.value = '';
-      return;
-    }
+    // We now upload via a secure server-side API route, so client-side Pinata credentials are not required.
 
     setIsUploading(true);
     try {
       const uploadedTokenURIs = [];
       for (const file of accepted) {
-        const form = new FormData();
-        form.append('file', file);
-        form.append('pinataMetadata', JSON.stringify({ name: file.name }));
-
-        let usingJwt = Boolean(jwt);
-        if (apiVersion === '1') usingJwt = false;
-        if (apiVersion === '3') usingJwt = true;
-
-        let endpoint = usingJwt
-          ? 'https://api.pinata.cloud/pinning/pinFileToIPFS'
-          : 'https://api.pinata.cloud/pinning/pinFileToIPFS';
-
-        const headers = usingJwt
-          ? { Authorization: `Bearer ${jwt}` }
-          : {
-              pinata_api_key: apiKey,
-              pinata_secret_api_key: apiSecret,
-            };
-
-        if (usingJwt) {
-          const opts = groupId && groupId.trim()
-            ? { cidVersion: 1, groupId: groupId.trim() }
-            : { cidVersion: 1 };
-          form.append('pinataOptions', JSON.stringify(opts));
-        } else {
-          form.append('pinataOptions', JSON.stringify({ cidVersion: 1 }));
-        }
-
-        // Step 1: Upload to Pinata
+        // Step 1: Upload to server API which forwards to Pinata securely
+        const svgBase64 = await fileToBase64(file);
         let tokenURI = '';
         try {
-          let res = await fetch(endpoint, { method: 'POST', headers, body: form });
+          const res = await fetch('/api/pinata/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: file.name, base64: svgBase64, groupId: groupId || '' }),
+          });
           if (!res.ok) {
-            if (usingJwt && res.status === 404 && apiKey && apiSecret) {
-              const v1Headers = {
-                pinata_api_key: apiKey,
-                pinata_secret_api_key: apiSecret,
-                'x-pinata-api-key': apiKey,
-                'x-pinata-secret-api-key': apiSecret,
-              };
-              const v1Form = new FormData();
-              v1Form.append('file', file);
-              v1Form.append('pinataMetadata', JSON.stringify({ name: file.name }));
-              v1Form.append('pinataOptions', JSON.stringify({ cidVersion: 1 }));
-              endpoint = 'https://api.pinata.cloud/pinning/pinFileToIPFS';
-              res = await fetch(endpoint, { method: 'POST', headers: v1Headers, body: v1Form });
-            }
-          }
-          if (!res.ok) {
-            const errText = await res.text().catch(() => '');
-            console.error('Pinata upload error', { endpoint, status: res.status, statusText: res.statusText, errText });
+            const t = await res.text().catch(() => '');
+            console.error('Server upload error', res.status, res.statusText, t);
             throw new Error(`Pinata upload failed for ${file.name}: ${res.status} ${res.statusText}`);
           }
           const data = await res.json();
-          const hash = data.IpfsHash || (data?.data?.IpfsHash);
-          if (!hash) throw new Error('No IpfsHash returned from Pinata');
-          tokenURI = `ipfs://${hash}`;
+          tokenURI = data.tokenURI;
+          if (!tokenURI) throw new Error('No tokenURI returned from server upload');
         } catch (uploadErr) {
-          // If upload fails, stop processing this file and surface a clear error
-          console.error('Upload to Pinata failed', uploadErr);
+          console.error('Upload to server failed', uploadErr);
           throw uploadErr;
         }
 
-        // Step 2: Prepare raw svg base64 and submit on-chain proposal
+        // Step 2: Submit on-chain proposal with tokenURI and svg base64
         try {
-          const svgBase64 = await fileToBase64(file);
           const signer = await getSigner();
           const contract = getContract(signer);
           const tx = await contract.propose(tokenURI, svgBase64);
           await tx.wait();
         } catch (chainErr) {
           console.error('On-chain proposal failed', chainErr);
-          // Provide a clear message for UI and logs
           throw new Error(`On-chain proposal failed for ${file.name}: ${chainErr?.message || chainErr}`);
         }
 

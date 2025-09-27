@@ -26,7 +26,11 @@ export default function App({ Component, pageProps }) {
     apiSecret: process.env.NEXT_PUBLIC_PINATA_API_SECRET,
     groupId: process.env.NEXT_PUBLIC_PINATA_GROUP_ID,
     apiVersion: (process.env.NEXT_PUBLIC_PINATA_API_VERSION || '').trim(),
-    gatewayBase: (process.env.NEXT_PUBLIC_PINATA_GATEWAY_BASE || 'https://gateway.pinata.cloud/ipfs/').replace(/\/$/, '/'),
+    gatewayBase: (
+      process.env.NEXT_PUBLIC_PINATA_GATEWAY_BASE ||
+      process.env.PINATA_GATEWAY_BASE ||
+      'https://gateway.pinata.cloud/ipfs/'
+    ).replace(/\/$/, '/'),
   }), []);
 
   return (

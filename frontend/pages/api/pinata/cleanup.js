@@ -4,7 +4,11 @@ export default async function handler(req, res) {
   }
   const { groupId, winningTokenURI, allTokenURIs } = req.body || {};
   const jwt = process.env.PINATA_JWT;
-  if (!jwt) return res.status(500).json({ error: 'Server PINATA_JWT not set' });
+  const apiKey = process.env.PINATA_API_KEY;
+  const apiSecret = process.env.PINATA_API_SECRET;
+  if (!jwt && !(apiKey && apiSecret)) {
+    return res.status(500).json({ error: 'Server Pinata credentials not set: provide PINATA_JWT or PINATA_API_KEY and PINATA_API_SECRET' });
+  }
   if (!Array.isArray(allTokenURIs) || !winningTokenURI) {
     return res.status(400).json({ error: 'Missing winningTokenURI or allTokenURIs' });
   }
@@ -38,20 +42,33 @@ export default async function handler(req, res) {
       if (cid && cid !== winnerCid) targetCids.add(cid);
     }
 
-    const v3Headers = { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' };
+    const v3Headers = jwt
+      ? { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' }
+      : null;
+    const v1Headers = jwt
+      ? { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' }
+      : {
+          pinata_api_key: apiKey,
+          pinata_secret_api_key: apiSecret,
+          'Content-Type': 'application/json',
+        };
 
     const results = [];
     // Optional: if groupId provided, attempt to remove files from the group (best-effort)
     if (groupId && String(groupId).trim().length) {
       for (const cid of targetCids) {
         try {
-          // Pinata v3: Unpin by CID (content API)
-          // Docs evolve; attempt a DELETE on v3 content endpoint, fallback to v1 unpin
+          // Prefer v3 with JWT if available, else use v1 with available creds
           let ok = false;
-          let resp = await fetch(`https://api.pinata.cloud/v3/content/${cid}`, { method: 'DELETE', headers: v3Headers });
-          if (!resp.ok) {
-            // fallback to v1 unpin by CID
-            resp = await fetch(`https://api.pinata.cloud/pinning/unpin/${cid}`, { method: 'DELETE', headers: v3Headers });
+          let resp;
+          if (v3Headers) {
+            resp = await fetch(`https://api.pinata.cloud/v3/content/${cid}`, { method: 'DELETE', headers: v3Headers });
+            if (!resp.ok) {
+              // fallback to v1 unpin by CID with same headers or switch to API keys
+              resp = await fetch(`https://api.pinata.cloud/pinning/unpin/${cid}`, { method: 'DELETE', headers: v1Headers });
+            }
+          } else {
+            resp = await fetch(`https://api.pinata.cloud/pinning/unpin/${cid}`, { method: 'DELETE', headers: v1Headers });
           }
           ok = resp.ok;
           if (!ok) {
@@ -68,7 +85,7 @@ export default async function handler(req, res) {
       // No groupId: simply unpin non-winners by CID
       for (const cid of targetCids) {
         try {
-          const resp = await fetch(`https://api.pinata.cloud/pinning/unpin/${cid}`, { method: 'DELETE', headers: v3Headers });
+          const resp = await fetch(`https://api.pinata.cloud/pinning/unpin/${cid}`, { method: 'DELETE', headers: v1Headers });
           if (!resp.ok) {
             const t = await resp.text().catch(() => '');
             results.push({ cid, status: 'failed', error: t });
