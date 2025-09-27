@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "forge-std/Script.sol";
 import {NFTMinter} from "../src/NFTMinter.sol";
 import {Voting} from "../src/Voting.sol";
-import {NFTAuction} from "../src/NFTAuction.sol";
+import {NFTAuction} from "../src/Auction.sol";
 
 contract DeployVoting is Script {
     // Configure your collection name/symbol here

@@ -5,7 +5,7 @@ import "@chainlink/contracts/src/v0.8/automation/interfaces/AutomationCompatible
 import {NFTMinter} from "./NFTMinter.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import {NFTAuction} from "./NFTAuction.sol";
+import {NFTAuction} from "./Auction.sol";
 
 contract Voting is AutomationCompatibleInterface, IERC721Receiver {
     // --- Proposal model (stored per session) ---

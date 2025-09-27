@@ -73,18 +73,18 @@ contract VotingAuctionTest is Test {
         assertEq(voting.votes(0), 1);
         // Re-vote in the same day should revert
         vm.prank(voter1);
-        vm.expectRevert(bytes("Already voted today"));
+        vm.expectRevert(bytes("Already voted this session"));
         voting.vote(0);
         // Advance to end of day and ensure voting closes
         vm.warp(end);
         vm.prank(voter2);
-        vm.expectRevert(bytes("Voting closed for today"));
+        vm.expectRevert(bytes("Voting closed"));
         voting.vote(1);
     }
 
     function testVoteInvalidCandidate() public {
         vm.prank(voter1);
-        vm.expectRevert(bytes("Invalid candidate"));
+        vm.expectRevert(bytes("Bad id"));
         voting.vote(20);
     }
 
