@@ -17,10 +17,37 @@ export const initMiniKit = () => {
   }
 };
 
-// Get RPC provider directly (for reading contract state without wallet)
+// Cached provider instance to avoid creating multiple connections
+let cachedProvider = null;
+
+// Simple, reliable RPC provider - use only Alchemy public endpoint
 export function getRPCProvider() {
-  const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL || 'https://worldchain-sepolia.g.alchemy.com/public';
-  return new ethers.JsonRpcProvider(rpcUrl);
+  // Return cached provider if available
+  if (cachedProvider) {
+    return cachedProvider;
+  }
+
+  // Force use of Alchemy public endpoint - most reliable for World Chain Sepolia
+  const rpcUrl = 'https://worldchain-sepolia.g.alchemy.com/public';
+
+  cachedProvider = new ethers.JsonRpcProvider(rpcUrl, {
+    chainId: 4801,
+    name: 'World Chain Sepolia'
+  });
+
+  // Add basic error handling
+  cachedProvider.on('error', (error) => {
+    console.warn('RPC Provider error:', error.message);
+  });
+
+  console.log('Created new RPC provider using:', rpcUrl);
+  return cachedProvider;
+}
+
+// Force refresh provider (clear cache)
+export function refreshRPCProvider() {
+  cachedProvider = null;
+  return getRPCProvider();
 }
 
 export function getProvider() {

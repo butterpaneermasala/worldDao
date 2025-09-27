@@ -267,8 +267,16 @@ export async function checkAllContracts() {
     try {
         // Use RPC provider directly for contract checking instead of wallet provider
         const provider = getRPCProvider();
-        const network = await provider.getNetwork();
-        const networkName = EXPECTED_NETWORKS[Number(network.chainId)] || 'Unknown Network';
+
+        let network, networkName;
+        try {
+            network = await provider.getNetwork();
+            networkName = EXPECTED_NETWORKS[Number(network.chainId)] || 'Unknown Network';
+        } catch (networkError) {
+            console.warn('Network detection failed, using default values:', networkError.message);
+            network = { chainId: 4801 };
+            networkName = 'World Chain Sepolia (assumed)';
+        }
 
         console.log(`📊 Network Information:`);
         console.log(`   Chain ID: ${network.chainId}`);
