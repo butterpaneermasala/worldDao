@@ -19,31 +19,33 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { name, base64, groupId } = req.body || {};
+    const { name, base64, groupId, mime } = req.body || {};
     if (!name || !base64) {
       return res.status(400).json({ error: 'Missing name or base64' });
     }
 
     // Decode base64 -> Blob for FormData
     const buffer = Buffer.from(String(base64), 'base64');
-    const blob = new Blob([buffer], { type: 'image/svg+xml' });
+    // Determine content type
+    let contentType = 'application/octet-stream';
+    if (typeof mime === 'string' && mime) {
+      contentType = mime;
+    } else if (name.toLowerCase().endsWith('.svg')) {
+      contentType = 'image/svg+xml';
+    } else if (name.toLowerCase().endsWith('.png')) {
+      contentType = 'image/png';
+    }
+    const blob = new Blob([buffer], { type: contentType });
 
     const form = new FormData();
     form.append('file', blob, name);
     form.append('pinataMetadata', JSON.stringify({ name }));
 
-    const groupIdEnv = process.env.PINATA_GROUP_ID || process.env.NEXT_PUBLIC_PINATA_GROUP_ID || '';
-    const finalGroupId = (groupId && String(groupId).trim()) || (groupIdEnv && String(groupIdEnv).trim()) || '';
-    if (finalGroupId) {
-      console.log('[pinata/upload] Using groupId:', finalGroupId);
-    }
-    const opts = finalGroupId
-      ? { cidVersion: 1, groupId: finalGroupId }
-      : { cidVersion: 1 };
+    const opts = { cidVersion: 1 };
     form.append('pinataOptions', JSON.stringify(opts));
 
     let resp;
-    const shouldUseJwtForGrouping = Boolean(finalGroupId && jwt);
+    const shouldUseJwtForGrouping = Boolean(groupId && jwt);
     if (shouldUseJwtForGrouping) {
       // When a groupId is present and we have a valid JWT, use JWT upload to ensure grouping works reliably
       console.log('[pinata/upload] Using JWT for upload (group mode)');
@@ -74,35 +76,39 @@ export default async function handler(req, res) {
     }
 
     if (!resp.ok) {
-      const t = await resp.text().catch(() => '');
-      return res.status(resp.status).json({ error: `Pinata upload failed: ${resp.status} ${resp.statusText}`, details: t });
+      const responseText = await resp.text().catch(() => '');
+      console.error(`[pinata/upload] API request failed: ${resp.status} ${resp.statusText}`, {
+        status: resp.status,
+        statusText: resp.statusText,
+        response: responseText,
+        headers: Object.fromEntries(resp.headers.entries())
+      });
+
+      // Don't treat 502 as a complete failure - the upload might have succeeded
+      if (resp.status === 502) {
+        console.warn('[pinata/upload] 502 Bad Gateway - upload may have succeeded despite error');
+        // Return success with a warning instead of failing completely
+        return res.status(200).json({
+          tokenURI: null,
+          warning: 'Upload may have succeeded but server returned 502. Check Pinata dashboard.',
+          status: resp.status,
+          details: responseText
+        });
+      }
+
+      return res.status(resp.status).json({ error: `Pinata upload failed: ${resp.status} ${resp.statusText}`, details: responseText });
     }
 
     const data = await resp.json();
+    console.log('[pinata/upload] Pinata response:', { status: resp.status, data: data?.IpfsHash ? '[HASH PRESENT]' : data });
+
     const hash = data.IpfsHash || (data?.data?.IpfsHash);
     if (!hash) {
-      return res.status(502).json({ error: 'No IpfsHash returned from Pinata' });
+      console.error('[pinata/upload] No IpfsHash in response:', data);
+      return res.status(502).json({ error: 'No IpfsHash returned from Pinata', responseData: data });
     }
+    console.log('[pinata/upload] Upload successful, hash:', hash);
 
-    // If we have a JWT and a finalGroupId, ensure the CID is added to the group via v3 API
-    if (jwt && finalGroupId) {
-      try {
-        const addResp = await fetch(`https://api.pinata.cloud/v3/groups/${encodeURIComponent(finalGroupId)}/contents`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cids: [hash] }),
-        });
-        if (!addResp.ok) {
-          const t = await addResp.text().catch(() => '');
-          console.warn('[pinata/upload] add-to-group failed', addResp.status, addResp.statusText, t);
-          return res.status(502).json({ error: 'Failed to add CID to Pinata group', status: addResp.status, statusText: addResp.statusText, details: t });
-        }
-        console.log('[pinata/upload] Added CID to group successfully');
-      } catch (e) {
-        console.warn('[pinata/upload] add-to-group error', String(e));
-        return res.status(502).json({ error: 'Exception while adding CID to Pinata group', details: String(e) });
-      }
-    }
 
     return res.status(200).json({ tokenURI: `ipfs://${hash}` });
   } catch (e) {

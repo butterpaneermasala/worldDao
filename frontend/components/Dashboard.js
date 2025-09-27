@@ -1,4 +1,4 @@
-import React, { useContext, useRef, useState } from 'react';
+import React, { useContext, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { AppContext } from '@/pages/_app';
 import NftGallery from '@/components/dashboard/NftGallery';
@@ -14,9 +14,38 @@ export default function Dashboard() {
   const [showFullscreen, setShowFullscreen] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [isVotingOpen, setIsVotingOpen] = useState(false);
   const [loadingProposals, setLoadingProposals] = useState(false);
+  const [isVotingOpen, setIsVotingOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const fileInputRef = useRef(null);
+
+  const handleRefresh = async () => {
+    try {
+      setRefreshing(true);
+      // First load from Pinata
+      await refreshProposals(null);
+
+      // Then try to enhance with wallet data if available
+      try {
+        const provider = getProvider();
+        const contract = await getContract(provider);
+        const open = await contract.isVotingOpen();
+        setIsVotingOpen(open);
+
+        if (open) {
+          await refreshProposals(contract);
+        }
+      } catch (e) {
+        // Wallet not available - that's fine
+        setIsVotingOpen(false);
+      }
+    } catch (e) {
+      console.error('Refresh failed:', e);
+      alert('Failed to refresh proposals. See console for details.');
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const { jwt, apiKey, apiSecret, groupId, apiVersion, gatewayBase } = pinataConfig;
 
@@ -33,154 +62,131 @@ export default function Dashboard() {
     reader.readAsDataURL(file);
   });
 
+  // fetch proposals from Pinata API and optionally enrich with on-chain votes
+  const refreshProposals = useCallback(async (contract) => {
+    try {
+      setLoadingProposals(true);
+      const res = await fetch('/api/pinata/slots');
+      if (!res.ok) throw new Error(`failed to fetch slots: ${res.status}`);
+      const data = await res.json();
+      let slots = Array.isArray(data.slots) ? data.slots : [];
+      let nextItems = slots
+        .filter(s => s && s.hasContent)
+        .map(s => ({ index: s.index, url: s.url, name: s.name || `nft-${s.index + 1}`, cid: s.cid, tokenURI: s.tokenURI }));
+
+      if (contract) {
+        try {
+          const votes = await Promise.all(nextItems.map(it => contract.slotVotes(it.index)));
+          nextItems = nextItems.map((it, i) => ({ ...it, votes: Number(votes[i]) || 0 }));
+        } catch (e) {
+          console.warn('failed to read votes from contract', e);
+        }
+      }
+
+      setItems(nextItems);
+    } catch (e) {
+      console.error('refreshProposals failed', e);
+      setItems([]);
+    } finally {
+      setLoadingProposals(false);
+    }
+  }, [setItems, setLoadingProposals]);
+
+  // handle local file selection -> uploads to Pinata via server API
+  const handleFileChange = async (e) => {
+    try {
+      const files = Array.from(e.target.files || []);
+      if (!files.length) return;
+      setIsUploading(true);
+
+      for (const file of files) {
+        try {
+          // Only allow SVG or PNG
+          const mime = file.type || '';
+          const isSvg = mime === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg');
+          const isPng = mime === 'image/png' || file.name.toLowerCase().endsWith('.png');
+          if (!isSvg && !isPng) {
+            console.warn('Skipping unsupported file type:', file.name, mime);
+            continue;
+          }
+
+          const base64 = await fileToBase64(file);
+          const resp = await fetch('/api/pinata/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: file.name, base64, groupId }),
+          });
+          const data = await resp.json();
+          if (!resp.ok) {
+            console.error('Upload error for', file.name, data);
+            alert(`Upload failed for ${file.name}: ${data.error || resp.statusText}`);
+          }
+        } catch (inner) {
+          console.error('Upload inner error for file', file?.name, inner);
+        }
+      }
+
+      // After uploads, refresh list
+      const provider = getProvider();
+      const readContract = await getContract(provider);
+      await refreshProposals(readContract);
+    } catch (err) {
+      console.error('upload failed', err);
+      alert('Upload failed. See console for details.');
+    } finally {
+      setIsUploading(false);
+      // clear input
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const handleVote = async (proposalIndex) => {
     try {
       const signer = await getSigner();
-      const contract = getContract(signer);
-      const tx = await contract.vote(proposalIndex);
+      const contract = await getContract(signer);
+      const tx = await contract.voteIndex(proposalIndex);
       await tx.wait();
       alert('Vote submitted');
       // Optional: refresh proposals to reflect updated votes if needed
       const provider = getProvider();
-      await refreshProposals(getContract(provider));
+      const readContract = await getContract(provider);
+      await refreshProposals(readContract);
     } catch (e) {
       console.error('vote failed', e);
       alert('Vote failed. See console for details.');
     }
   };
 
-  // Load voting status and proposals when voting opens
+  // Load voting status and check if we need to load from blockchain or Pinata
   useEffect(() => {
-    let unsub;
     const init = async () => {
+      // First, always load NFTs from Pinata
+      try {
+        await refreshProposals(null);
+      } catch (e) {
+        console.error('Failed to load proposals from Pinata:', e);
+      }
+
+      // Then, optionally try to connect to wallet for voting status and enhanced features
       try {
         const provider = getProvider();
-        const contract = getContract(provider);
+        const contract = await getContract(provider);
         const open = await contract.isVotingOpen();
         setIsVotingOpen(open);
+
+        // Refresh with contract context to get vote counts if voting is open
         if (open) {
           await refreshProposals(contract);
         }
-        // Listen for VotingOpened and Finalized
-        contract.on('VotingOpened', async () => {
-          setIsVotingOpen(true);
-          await refreshProposals(contract);
-        });
-        contract.on('Finalized', async (dayIndex, winningId, winningVotes, tokenId, winningTokenURI) => {
-          // Trigger cleanup of non-winning CIDs in the group
-          try {
-            const allTokenURIs = items.map((it) => it.url);
-            await fetch('/api/pinata/cleanup', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                groupId: groupId || '',
-                winningTokenURI: String(winningTokenURI),
-                allTokenURIs,
-              }),
-            });
-          } catch (e) {
-            console.warn('Cleanup failed', e);
-          }
-          // After finalize, gallery will close automatically until next VotingOpened
-          setIsVotingOpen(false);
-          setItems([]);
-        });
-        unsub = () => {
-          contract.removeAllListeners('VotingOpened');
-          contract.removeAllListeners('Finalized');
-        };
       } catch (e) {
-        console.warn('web3 init failed', e);
+        // Wallet not connected or contract interaction failed - that's okay
+        console.log('Wallet not connected or contract unavailable:', e.message);
+        setIsVotingOpen(false);
       }
     };
+
     init();
-    return () => { if (unsub) try { unsub(); } catch {} };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const refreshProposals = async (contract) => {
-    try {
-      setLoadingProposals(true);
-      const count = Number(await contract.proposalsCount());
-      const next = [];
-      for (let i = 0; i < count; i++) {
-        const p = await contract.proposals(i);
-        // use tokenURI as display src; fallback to gateway if ipfs://
-        const url = p.tokenURI && p.tokenURI.startsWith('ipfs://')
-          ? `${gatewayBase}${p.tokenURI.slice('ipfs://'.length)}`
-          : (p.tokenURI || '');
-        next.push({ url, name: `proposal-${i}`, type: 'image/svg+xml', hash: null });
-      }
-      setItems(next);
-      setSelectedIndex(null);
-    } finally {
-      setLoadingProposals(false);
-    }
-  };
-
-  const handleFileChange = async (e) => {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
-    const validTypes = ['image/svg+xml'];
-    const accepted = files.filter((f) => validTypes.includes(f.type));
-    if (accepted.length === 0) {
-      alert('Please select SVG files only.');
-      e.target.value = '';
-      return;
-    }
-
-    // We now upload via a secure server-side API route, so client-side Pinata credentials are not required.
-
-    setIsUploading(true);
-    try {
-      const uploadedTokenURIs = [];
-      for (const file of accepted) {
-        // Step 1: Upload to server API which forwards to Pinata securely
-        const svgBase64 = await fileToBase64(file);
-        let tokenURI = '';
-        try {
-          const res = await fetch('/api/pinata/upload', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: file.name, base64: svgBase64, groupId: groupId || '' }),
-          });
-          if (!res.ok) {
-            const t = await res.text().catch(() => '');
-            console.error('Server upload error', res.status, res.statusText, t);
-            throw new Error(`Pinata upload failed for ${file.name}: ${res.status} ${res.statusText}`);
-          }
-          const data = await res.json();
-          tokenURI = data.tokenURI;
-          if (!tokenURI) throw new Error('No tokenURI returned from server upload');
-        } catch (uploadErr) {
-          console.error('Upload to server failed', uploadErr);
-          throw uploadErr;
-        }
-
-        // Step 2: Submit on-chain proposal with tokenURI and svg base64
-        try {
-          const signer = await getSigner();
-          const contract = getContract(signer);
-          const tx = await contract.propose(tokenURI, svgBase64);
-          await tx.wait();
-        } catch (chainErr) {
-          console.error('On-chain proposal failed', chainErr);
-          throw new Error(`On-chain proposal failed for ${file.name}: ${chainErr?.message || chainErr}`);
-        }
-
-        uploadedTokenURIs.push(tokenURI);
-      }
-      // Do not show in gallery yet; proposals will be visible only when voting opens.
-      alert('Proposal(s) submitted on-chain. They will appear when voting opens.');
-    } catch (err) {
-      console.error('Upload/Proposal failed', err);
-      alert((err && err.message) ? err.message : 'Failed to process file(s). See console for details.');
-    } finally {
-      setIsUploading(false);
-      e.target.value = '';
-    }
-  };
+  }, [setItems, refreshProposals]);
 
   return (
     <div className="dashboard-container">
@@ -196,29 +202,48 @@ export default function Dashboard() {
         <div className="dashboard-right panel">
           <div className="right-header">
             <div className="right-title">proposed nfts</div>
-            <button className="enlarge-button" onClick={() => setShowFullscreen(true)} title="Enlarge">⤢</button>
-          </div>
-          {!isVotingOpen ? (
-            <div className="placeholder-text">
-              waiting for voting to start... you can propose SVGs now.
+            <div className="header-buttons">
+              <button
+                className="refresh-button"
+                onClick={handleRefresh}
+                disabled={refreshing}
+                title="Refresh proposals"
+              >
+                {refreshing ? '⟳' : '↻'}
+              </button>
+              <button className="enlarge-button" onClick={() => setShowFullscreen(true)} title="Enlarge">⤢</button>
             </div>
-          ) : loadingProposals ? (
+          </div>
+          {loadingProposals ? (
             <div className="placeholder-text">loading proposals...</div>
-          ) : items.length > 0 ? (
-            <NftGallery
-              items={items}
-              selectedIndex={selectedIndex}
-              onSelect={setSelectedIndex}
-              showVote
-              onVote={handleVote}
-            />
           ) : (
-            <div className="placeholder-text">no uploads yet</div>
+            <>
+              <div className="phase-indicator">
+                {isVotingOpen ? (
+                  <span className="phase-voting">🗳️ Voting Phase - Cast your votes!</span>
+                ) : (
+                  <span className="phase-uploading">📤 Upload Phase - Submit your SVGs (no wallet needed)</span>
+                )}
+              </div>
+              {items.length > 0 ? (
+                <NftGallery
+                  items={items}
+                  selectedIndex={selectedIndex}
+                  onSelect={setSelectedIndex}
+                  showVote={isVotingOpen}
+                  onVote={handleVote}
+                />
+              ) : (
+                <div className="placeholder-text">
+                  {isVotingOpen ? "no uploads yet" : "ready to upload SVGs - click 'propose your own nft' below (no wallet needed!)"}
+                </div>
+              )}
+            </>
           )}
           {isUploading && <div className="uploading-text">uploading to ipfs...</div>}
           <input
             type="file"
-            accept=".svg,image/svg+xml"
+            accept=".svg,image/svg+xml,.png,image/png"
             multiple
             style={{ display: 'none' }}
             ref={fileInputRef}

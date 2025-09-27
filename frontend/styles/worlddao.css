@@ -50,7 +50,32 @@ code { font-family: 'Press Start 2P', cursive; }
 .dashboard-left { flex: 0 0 70%; background: rgba(255,255,255,0.02); border-right: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.5); font-family: 'Press Start 2P', cursive; font-size: 0.8rem; }
 .nft-thumb-card { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .nft-thumb-card.selected .nft-thumb-frame { border-color: rgba(156,204,101,0.9); box-shadow: 0 0 0 2px rgba(156,204,101,0.25); }
-.nft-thumb-frame { width: 120px; height: 120px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.2); border-radius: 8px; cursor: pointer; overflow: hidden; }
+.nft-thumb-frame {
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.02);
+  border: 1px dashed rgba(255,255,255,0.2);
+  border-radius: 8px;
+  cursor: pointer;
+  overflow: hidden;
+  position: relative;
+}
+.nft-thumb-card .status-indicator {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ff9800;
+  z-index: 2;
+}
+.nft-thumb-card.submitted .status-indicator {
+  background: #4caf50;
+}
 .nft-thumb-image { width: 100%; height: 100%; object-fit: contain; display: block; }
 .dashboard-right { flex: 0 0 30%; background: rgba(255,255,255,0.01); display: flex; align-items: stretch; justify-content: flex-start; color: rgba(255,255,255,0.5); font-family: 'Press Start 2P', cursive; padding: 1rem; flex-direction: column; }
 
@@ -59,7 +84,9 @@ code { font-family: 'Press Start 2P', cursive; }
 
 /* Right panel header */
 .right-header { width: 100%; display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
-.right-title { font-size: 0.75rem; opacity: 0.8; }
+.header-buttons { display: flex; align-items: center; gap: 0.5rem; }
+.refresh-button { font-family: 'Press Start 2P', cursive; font-size: 0.7rem; background: transparent; color: #ddd; border: 1px solid rgba(255,255,255,0.25); padding: 0.3rem 0.6rem; border-radius: 6px; cursor: pointer; transition: all 0.2s ease; min-width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
+.refresh-button:hover:not(:disabled) { background: rgba(255,255,255,0.08); color: #fff; }
 .enlarge-button { font-family: 'Press Start 2P', cursive; font-size: 0.7rem; background: transparent; color: #ddd; border: 1px solid rgba(255,255,255,0.25); padding: 0.3rem 0.6rem; border-radius: 6px; cursor: pointer; transition: all 0.2s ease; }
 .enlarge-button:hover { background: rgba(255,255,255,0.08); color: #fff; }
 
@@ -82,7 +109,18 @@ code { font-family: 'Press Start 2P', cursive; }
 .vote-button { font-family: 'Press Start 2P', cursive; font-size: 0.75rem; background: linear-gradient(45deg,#6a994e,#8bc34a); color: white; border: 2px solid #9ccc65; padding: 0.6rem 1.2rem; cursor: pointer; transition: all 0.2s ease; letter-spacing: 0.05em; text-transform: lowercase; border-radius: 6px; }
 .vote-button:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(0,0,0,0.25); }
 .placeholder-text { opacity: 0.6; text-align: center; font-size: 0.75rem; }
-.uploading-text { margin-top: 0.5rem; font-size: 0.7rem; opacity: 0.8; }
+.phase-indicator { margin-bottom: 1rem; text-align: center; }
+.phase-voting { color: #4caf50; font-size: 0.7rem; }
+.phase-uploading { color: #ff9800; font-size: 0.7rem; }
+.uploading-text { color: #2196f3; font-size: 0.7rem; text-align: center; margin: 0.5rem 0; opacity: 0.8; }
+.nft-thumb-card.pending {
+  border: 2px dashed #ff9800;
+  background: rgba(255, 152, 0, 0.1);
+}
+.nft-thumb-card.submitted {
+  border: 2px solid #4caf50;
+  background: rgba(76, 175, 80, 0.1);
+}
 
 .dashboard-bottom { height: 20vh; background: linear-gradient(135deg,#333 0%,#444 100%); border-top: 2px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; padding: 2rem; }
 .propose-button { font-family: 'Press Start 2P', cursive; font-size: clamp(0.7rem,1.5vw,0.9rem); background: linear-gradient(45deg,#666,#888); color: white; border: 2px solid #999; padding: 1rem 2rem; cursor: pointer; transition: all 0.3s ease; text-transform: lowercase; letter-spacing: 0.05em; position: relative; overflow: hidden; }
