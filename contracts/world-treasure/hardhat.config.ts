@@ -28,7 +28,7 @@ const config: HardhatUserConfig = {
       url: process.env.WORLDCHAIN_SEPOLIA_RPC_URL || "https://worldchain-sepolia.g.alchemy.com/v2/" + (process.env.ALCHEMY_API_KEY || ""),
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 4801,
-      gasPrice: 20000000000, // 20 gwei
+      gasPrice: 5000000000, // 5 gwei (reduced from 20 gwei)
     },
   },
   etherscan: {

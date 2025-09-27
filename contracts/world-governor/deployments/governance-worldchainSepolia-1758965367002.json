@@ -1,0 +1,23 @@
+{
+  "network": "worldchainSepolia",
+  "chainId": "4801",
+  "deployer": "0xe5eeD1EE1535a0DF01E0fE744C6156324D7De975",
+  "timestamp": "2025-09-27T09:29:26.658Z",
+  "blockNumber": 19208971,
+  "contracts": {
+    "candidateContract": "0x585d606c3F881eC66e0eD999930530EF454d08b9",
+    "worldChainGovernor": "0x627e9A7DF8e3860B14B95cf7Cf0D7eE120163dD8",
+    "worldNFT": "0x5BCAEf9a3059340f39e640875fE803422b5100C8",
+    "treasury": "0x0000000000000000000000000000000000000000"
+  },
+  "configuration": {
+    "votingPeriod": "100800",
+    "votingDelay": "1",
+    "quorum": "10",
+    "sponsorThreshold": "3"
+  },
+  "transactionHashes": {
+    "candidateContract": "0x5c1f36589be8e34680c379f817d95e020daca6b787204ef058cb7d7ce0d37b59",
+    "governor": "0xc20974e8febb3e0fe13d71282a4388e4ce651938319939735cdc55cc375f1348"
+  }
+}

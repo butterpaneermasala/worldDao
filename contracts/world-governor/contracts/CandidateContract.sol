@@ -2,7 +2,10 @@
 pragma solidity ^0.8.20;
 
 interface IProposalContract {
-    function propose(string memory description) external returns (uint256);
+    function propose(
+        string memory description,
+        bytes memory executionData
+    ) external returns (uint256);
 }
 
 interface INFT {
@@ -77,13 +80,24 @@ contract CandidateContract {
 
         emit CandidateSponsored(candidateId, msg.sender, c.sponsorCount);
 
-        // Step 3: If threshold reached, promote to ProposalContract
+        // Step 3: If threshold reached, promote candidate (ready for governance proposal)
         if (c.sponsorCount >= sponsorThreshold) {
-            uint256 proposalId = IProposalContract(proposalContract).propose(
-                c.description
-            );
             c.promoted = true;
-            emit CandidatePromoted(candidateId, proposalId);
+            // Emit event with proposalId 0 to indicate it's ready for manual proposal creation
+            emit CandidatePromoted(candidateId, 0);
         }
+    }
+
+    /**
+     * @notice Get promoted candidate description for manual proposal creation
+     * @param candidateId The candidate ID
+     * @return description The candidate description
+     */
+    function getPromotedCandidateDescription(
+        uint256 candidateId
+    ) external view returns (string memory) {
+        Candidate storage c = candidates[candidateId];
+        require(c.promoted, "Candidate not promoted yet");
+        return c.description;
     }
 }

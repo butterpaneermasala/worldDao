@@ -1,0 +1,11 @@
+{
+  "network": "worldchainSepolia",
+  "chainId": "4801",
+  "treasuryAddress": "0x09D96fCC17b16752ec3673Ea85B9a6fea697f697",
+  "governorAddress": "0x627e9A7DF8e3860B14B95cf7Cf0D7eE120163dD8",
+  "deployer": "0xe5eeD1EE1535a0DF01E0fE744C6156324D7De975",
+  "blockNumber": 19209751,
+  "transactionHash": "0x81544b5f9f29ead0952bf88adf0822ced683765290181886e93efa65c805e46b",
+  "timestamp": "2025-09-27T09:55:28.085Z",
+  "gasUsed": "1127660"
+}
