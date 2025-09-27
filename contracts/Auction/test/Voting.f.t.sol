@@ -82,10 +82,10 @@ contract VotingFuzzTest is Test {
         // bound idx to [0, count-1]
         uint256 id = bound(uint256(idx), 0, count - 1);
         vm.prank(voter);
-        voting.vote(id);
+        voting.voteIndex(uint8(id));
         vm.prank(voter);
         vm.expectRevert(bytes("Already voted this session"));
-        voting.vote(id);
+        voting.voteIndex(uint8(id));
     }
 
     // Unit: finalize mints and starts auction, then Bidding->Uploading cycles
@@ -96,7 +96,7 @@ contract VotingFuzzTest is Test {
         vm.warp(endUpload + 1);
         voting.performUpkeep(""); // open voting
         // cast a vote to ensure a winner exists
-        voting.vote(0);
+        voting.voteIndex(0);
         ( , uint256 endVote) = voting.currentPhaseInfo();
         vm.warp(endVote + 1);
         voting.performUpkeep(""); // finalize -> bidding
