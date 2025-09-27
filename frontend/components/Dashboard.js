@@ -2,6 +2,9 @@ import React, { useContext, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { AppContext } from '@/pages/_app';
 import NftGallery from '@/components/dashboard/NftGallery';
+import VotingGallery from '@/components/dashboard/VotingGallery';
+import AuctionResults from '@/components/dashboard/AuctionResults';
+import ContractStatus from '@/components/ContractStatus';
 import UploadModal from '@/components/dashboard/UploadModal';
 import FullscreenGallery from '@/components/dashboard/FullscreenGallery';
 import { useEffect } from 'react';
@@ -27,10 +30,11 @@ export default function Dashboard() {
       // First load from Pinata
       await refreshProposals(null);
 
-      // Then try to enhance with wallet data if available
+      // Then try to enhance with contract data using RPC
       try {
-        const provider = getProvider();
-        const contract = await getContract(provider);
+        const { getContractRPC, getRPCProvider } = await import('@/lib/web3');
+        const contract = await getContractRPC();
+        const provider = getRPCProvider();
 
         // Check if contract is deployed
         const code = await provider.getCode(contract.target || contract.address);
@@ -47,7 +51,7 @@ export default function Dashboard() {
           await refreshProposals(contract);
         }
       } catch (e) {
-        // Wallet not available - that's fine
+        // RPC provider failed
         console.log('Contract check failed:', e.message);
         setIsVotingOpen(false);
       }
@@ -139,8 +143,8 @@ export default function Dashboard() {
       }
 
       // After uploads, refresh list
-      const provider = getProvider();
-      const readContract = await getContract(provider);
+      const { getContractRPC } = await import('@/lib/web3');
+      const readContract = await getContractRPC();
       await refreshProposals(readContract);
     } catch (err) {
       console.error('upload failed', err);
@@ -160,8 +164,8 @@ export default function Dashboard() {
       await tx.wait();
       alert('Vote submitted');
       // Optional: refresh proposals to reflect updated votes if needed
-      const provider = getProvider();
-      const readContract = await getContract(provider);
+      const { getContractRPC } = await import('@/lib/web3');
+      const readContract = await getContractRPC();
       await refreshProposals(readContract);
     } catch (e) {
       console.error('vote failed', e);
@@ -179,10 +183,11 @@ export default function Dashboard() {
         console.error('Failed to load proposals from Pinata:', e);
       }
 
-      // Then, optionally try to connect to wallet for voting status and enhanced features
+      // Then, check contract status using RPC provider (no wallet needed)
       try {
-        const provider = getProvider();
-        const contract = await getContract(provider);
+        const { getContractRPC, getRPCProvider } = await import('@/lib/web3');
+        const contract = await getContractRPC();
+        const provider = getRPCProvider();
 
         // Check if contract is deployed and has the method
         const code = await provider.getCode(contract.target || contract.address);
@@ -217,6 +222,9 @@ export default function Dashboard() {
         {isConnected && <span className="connected-indicator">✓ Connected: {address?.slice(0, 6)}...{address?.slice(-4)}</span>}
       </div>
 
+      {/* Contract Status */}
+      <ContractStatus />
+
       <div className="dashboard-main">
         {/* Auction Section */}
         <div className="dashboard-section auction-section panel">
@@ -224,13 +232,7 @@ export default function Dashboard() {
             <div className="section-title">🎯 auction house</div>
             <div className="section-subtitle">bid on exclusive nfts</div>
           </div>
-          <div className="auction-content">
-            <div className="auction-placeholder">
-              <div className="auction-icon">🏛️</div>
-              <p>live auctions coming soon</p>
-              <p className="small-text">place bids on community favorites</p>
-            </div>
-          </div>
+          <AuctionResults />
           <div className="panel-overlay">
             <button className="panel-overlay-btn" onClick={() => router.push('/bidding')}>
               go to auction page
@@ -238,48 +240,17 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* NFT Gallery Section */}
+        {/* NFT Gallery Section with Enhanced Voting */}
         <div className="dashboard-section dashboard-right panel">
           <div className="right-header">
-            <div className="right-title">proposed nfts</div>
+            <div className="right-title">nft voting gallery</div>
             <div className="header-buttons">
-              <button
-                className="refresh-button"
-                onClick={handleRefresh}
-                disabled={refreshing}
-                title="Refresh proposals"
-              >
-                {refreshing ? '⟳' : '↻'}
-              </button>
               <button className="enlarge-button" onClick={() => setShowFullscreen(true)} title="Enlarge">⤢</button>
             </div>
           </div>
-          {loadingProposals ? (
-            <div className="placeholder-text">loading proposals...</div>
-          ) : (
-            <>
-              <div className="phase-indicator">
-                {isVotingOpen ? (
-                  <span className="phase-voting">🗳️ Voting Phase - Cast your votes!</span>
-                ) : (
-                  <span className="phase-uploading">📤 Upload Phase - Submit your SVGs (no wallet needed)</span>
-                )}
-              </div>
-              {items.length > 0 ? (
-                <NftGallery
-                  items={items}
-                  selectedIndex={selectedIndex}
-                  onSelect={setSelectedIndex}
-                  showVote={isVotingOpen}
-                  onVote={handleVote}
-                />
-              ) : (
-                <div className="placeholder-text">
-                  {isVotingOpen ? "no uploads yet" : "ready to upload SVGs - click 'propose your own nft' below (no wallet needed!)"}
-                </div>
-              )}
-            </>
-          )}
+
+          <VotingGallery />
+
           {isUploading && <div className="uploading-text">uploading to ipfs...</div>}
           <input
             type="file"
@@ -291,7 +262,7 @@ export default function Dashboard() {
           />
           <div className="panel-overlay">
             <button className="panel-overlay-btn" onClick={() => router.push('/voting')}>
-              go to voting page to view
+              go to full voting page
             </button>
           </div>
         </div>

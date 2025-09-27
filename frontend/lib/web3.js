@@ -17,6 +17,12 @@ export const initMiniKit = () => {
   }
 };
 
+// Get RPC provider directly (for reading contract state without wallet)
+export function getRPCProvider() {
+  const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL || 'https://worldchain-sepolia.g.alchemy.com/public';
+  return new ethers.JsonRpcProvider(rpcUrl);
+}
+
 export function getProvider() {
   if (typeof window !== "undefined") {
     // Check if Web3Modal is connected
@@ -111,6 +117,21 @@ export async function getContract(provider) {
   if (!addr) throw new Error("NEXT_PUBLIC_VOTING_ADDRESS not set");
   const VotingAbi = require("../abis/Voting.json");
   return new ethers.Contract(addr, VotingAbi, provider);
+}
+
+// Get contract using RPC provider (for reading without wallet)
+export async function getContractRPC() {
+  const provider = getRPCProvider();
+  return getContract(provider);
+}
+
+// Get auction contract using RPC provider
+export async function getAuctionContractRPC() {
+  const addr = process.env.NEXT_PUBLIC_AUCTION_ADDRESS;
+  if (!addr) throw new Error("NEXT_PUBLIC_AUCTION_ADDRESS not set");
+  const AuctionAbi = require("../abis/NFTAuction.json");
+  const provider = getRPCProvider();
+  return new ethers.Contract(addr, AuctionAbi, provider);
 }
 
 // Governance contract helpers

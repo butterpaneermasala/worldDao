@@ -67,45 +67,60 @@ contract VotingAuctionTest is Test {
 
     function testVoteSuccessAndOnePerDay() public {
         uint256 end = voting.currentDayEndIST();
+        // First transition from Uploading to Voting phase
+        vm.warp(end + 1);
+        voting.performUpkeep("");
+
+        uint256 newEnd = voting.currentDayEndIST();
         // voter1 votes candidate 0
         vm.prank(voter1);
-        voting.vote(0);
-        assertEq(voting.votes(0), 1);
+        voting.voteIndex(0);
+        assertEq(voting.slotVotes(0), 1);
         // Re-vote in the same day should revert
         vm.prank(voter1);
         vm.expectRevert(bytes("Already voted this session"));
-        voting.vote(0);
+        voting.voteIndex(0);
         // Advance to end of day and ensure voting closes
-        vm.warp(end);
+        vm.warp(newEnd + 1);
         vm.prank(voter2);
         vm.expectRevert(bytes("Voting closed"));
-        voting.vote(1);
+        voting.voteIndex(1);
     }
 
     function testVoteInvalidCandidate() public {
+        // First transition to Voting phase
+        uint256 end = voting.currentDayEndIST();
+        vm.warp(end + 1);
+        voting.performUpkeep("");
+
         vm.prank(voter1);
-        vm.expectRevert(bytes("Bad id"));
-        voting.vote(20);
+        vm.expectRevert(bytes("Bad index"));
+        voting.voteIndex(20);
     }
 
     function testTieBreakerFirstToReachHighestVotes() public {
+        // First transition to Voting phase
+        uint256 end = voting.currentDayEndIST();
+        vm.warp(end + 1);
+        voting.performUpkeep("");
+
         // Two candidates will end day with 2 votes each.
         // Candidate 1 should be the winner if it reached 2 first (earlier lastVoteTimestamp).
         // Order: voter1 -> cand1, voter2 -> cand1 (cand1 hits 2) then voter3 -> cand0 twice (hits 2 later)
         vm.prank(voter1);
-        voting.vote(1); // cand1:1
+        voting.voteIndex(1); // cand1:1
         // small time advance
         vm.warp(block.timestamp + 10);
         vm.prank(voter2);
-        voting.vote(1); // cand1:2 (earlier timestamp for reaching 2)
+        voting.voteIndex(1); // cand1:2 (earlier timestamp for reaching 2)
         vm.warp(block.timestamp + 10);
         vm.prank(voter3);
-        voting.vote(0); // cand0:1
+        voting.voteIndex(0); // cand0:1
         // Simulate second voter for cand0 on next address same day -> need a new address
         address voter4 = address(0xA4);
         deal(voter4, 1 ether);
         vm.prank(voter4);
-        voting.vote(0); // cand0:2 (reached later)
+        voting.voteIndex(0); // cand0:2 (reached later)
 
         // End the day
         vm.warp(voting.currentDayEndIST());
@@ -124,9 +139,14 @@ contract VotingAuctionTest is Test {
     // -------- Auction unit tests --------
 
     function testAuctionBiddingAndWithdraw() public {
+        // First transition to Voting phase and place a vote
+        uint256 end = voting.currentDayEndIST();
+        vm.warp(end + 1);
+        voting.performUpkeep("");
+
         // Prepare an auction by finalizing today's voting quickly
         vm.prank(voter1);
-        voting.vote(0);
+        voting.voteIndex(0);
         vm.warp(voting.currentDayEndIST());
         voting.performUpkeep("");
 
@@ -149,11 +169,16 @@ contract VotingAuctionTest is Test {
     // -------- Mega end-to-end flow --------
 
     function testMega_EndToEnd_DailyVotingThenNextDayAuctionAndFinalize() public {
+        // First transition to Voting phase
+        uint256 end = voting.currentDayEndIST();
+        vm.warp(end + 1);
+        voting.performUpkeep("");
+
         // Day 1: voting
         vm.prank(voter1);
-        voting.vote(5);
+        voting.voteIndex(5);
         vm.prank(voter2);
-        voting.vote(5);
+        voting.voteIndex(5);
         // End of day 1
         vm.warp(voting.currentDayEndIST());
         uint256 beforeMintBalance = IERC721(address(minter)).balanceOf(address(voting));

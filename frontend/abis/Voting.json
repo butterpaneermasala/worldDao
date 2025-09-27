@@ -1,10 +1,691 @@
 [
-  { "type": "function", "name": "isVotingOpen", "stateMutability": "view", "inputs": [], "outputs": [{ "name": "", "type": "bool" }] },
-  { "type": "function", "name": "currentPhaseInfo", "stateMutability": "view", "inputs": [], "outputs": [ { "name": "phase", "type": "uint8" }, { "name": "endTime", "type": "uint256" } ] },
-  { "type": "function", "name": "voteIndex", "stateMutability": "nonpayable", "inputs": [ { "name": "slotIndex", "type": "uint8" } ], "outputs": [] },
-  { "type": "function", "name": "slotVotes", "stateMutability": "view", "inputs": [ { "name": "idx", "type": "uint8" } ], "outputs": [ { "name": "", "type": "uint256" } ] },
-  { "type": "function", "name": "lastVoteTime", "stateMutability": "view", "inputs": [ { "name": "idx", "type": "uint8" } ], "outputs": [ { "name": "", "type": "uint256" } ] },
-  { "type": "function", "name": "finalizeWithWinner", "stateMutability": "nonpayable", "inputs": [ { "name": "tokenURI", "type": "string" }, { "name": "svgBase64", "type": "string" }, { "name": "winnerIndex", "type": "uint8" } ], "outputs": [] },
-  { "type": "event", "name": "Finalized", "inputs": [ { "name": "dayIndex", "type": "uint256", "indexed": true }, { "name": "winningProposalId", "type": "uint256", "indexed": true }, { "name": "winningVotes", "type": "uint256", "indexed": false }, { "name": "tokenId", "type": "uint256", "indexed": false }, { "name": "winningTokenURI", "type": "string", "indexed": false } ], "anonymous": false },
-  { "type": "event", "name": "VotingOpened", "inputs": [ { "name": "startTime", "type": "uint256", "indexed": false }, { "name": "endTime", "type": "uint256", "indexed": false }, { "name": "slotCount", "type": "uint256", "indexed": false } ], "anonymous": false }
+  {
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "_minter",
+        "type": "address",
+        "internalType": "contract NFTMinter"
+      },
+      {
+        "name": "_auction",
+        "type": "address",
+        "internalType": "contract NFTAuction"
+      },
+      {
+        "name": "",
+        "type": "string[20]",
+        "internalType": "string[20]"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "SLOT_COUNT",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "admin",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "auction",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract NFTAuction"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "biddingDuration",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "checkUpkeep",
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "upkeepNeeded",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "performData",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "currentDayEndIST",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "currentDayIndex",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "currentPhase",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "enum Voting.Phase"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "currentPhaseInfo",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "phase",
+        "type": "uint8",
+        "internalType": "enum Voting.Phase"
+      },
+      {
+        "name": "endTime",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "finalizeWithWinner",
+    "inputs": [
+      {
+        "name": "tokenURI",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "svgBase64",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "winnerIndex",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getProposal",
+    "inputs": [
+      {
+        "name": "index",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "proposer",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "tokenURI",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "svgBase64",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "voteCount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "isVotingOpen",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "lastVoteTime",
+    "inputs": [
+      {
+        "name": "idx",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "lastVoteTs",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "lastVotedSession",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "minter",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract NFTMinter"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "onERC721Received",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes4",
+        "internalType": "bytes4"
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "operator",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "performUpkeep",
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "phaseEnd",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "proposals",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "proposer",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "tokenURI",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "svgBase64",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "voteCount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "proposalsCount",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "propose",
+    "inputs": [
+      {
+        "name": "tokenURI",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "svgBase64",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setDurations",
+    "inputs": [
+      {
+        "name": "_upload",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_voting",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_bidding",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setOperator",
+    "inputs": [
+      {
+        "name": "_op",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "slotVotes",
+    "inputs": [
+      {
+        "name": "idx",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "tallies",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "uploadDuration",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "voteIndex",
+    "inputs": [
+      {
+        "name": "slotIndex",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "voteSessionId",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "votingDuration",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "event",
+    "name": "Finalized",
+    "inputs": [
+      {
+        "name": "dayIndex",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "winningProposalId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "winningVotes",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "winningTokenURI",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "PhaseChanged",
+    "inputs": [
+      {
+        "name": "phase",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "enum Voting.Phase"
+      },
+      {
+        "name": "phaseEnd",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ProposalCreated",
+    "inputs": [
+      {
+        "name": "proposalId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "proposer",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "tokenURI",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Voted",
+    "inputs": [
+      {
+        "name": "voter",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "slotIndex",
+        "type": "uint8",
+        "indexed": true,
+        "internalType": "uint8"
+      },
+      {
+        "name": "timestamp",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "VotingOpened",
+    "inputs": [
+      {
+        "name": "startTime",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "endTime",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "slotCount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  }
 ]

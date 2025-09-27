@@ -1,4 +1,4 @@
-import { getProvider } from './web3';
+import { getRPCProvider } from './web3';
 import { ethers } from 'ethers';
 
 /**
@@ -95,7 +95,7 @@ async function testContractFunctionality(provider, contractInfo) {
  */
 async function testVotingContract(provider, contractInfo) {
     try {
-        const VotingAbi = require("../abis/Voting.json");
+        const VotingAbi = (await import("../abis/Voting.json", { assert: { type: "json" } })).default;
         const contract = new ethers.Contract(contractInfo.address, VotingAbi, provider);
 
         // Test basic read functions
@@ -126,7 +126,7 @@ async function testVotingContract(provider, contractInfo) {
  */
 async function testGovernorContract(provider, contractInfo) {
     try {
-        const GovernorAbi = require("../abis/WorldChainGovernor.json");
+        const GovernorAbi = (await import("../abis/WorldChainGovernor.json", { assert: { type: "json" } })).default;
         const contract = new ethers.Contract(contractInfo.address, GovernorAbi, provider);
 
         // Test basic read function
@@ -151,7 +151,7 @@ async function testGovernorContract(provider, contractInfo) {
  */
 async function testCandidateContract(provider, contractInfo) {
     try {
-        const CandidateAbi = require("../abis/CandidateContract.json");
+        const CandidateAbi = (await import("../abis/CandidateContract.json", { assert: { type: "json" } })).default;
         const contract = new ethers.Contract(contractInfo.address, CandidateAbi, provider);
 
         // Test basic read function
@@ -265,7 +265,8 @@ export async function checkAllContracts() {
     console.log('🔍 Starting comprehensive contract deployment check...\n');
 
     try {
-        const provider = getProvider();
+        // Use RPC provider directly for contract checking instead of wallet provider
+        const provider = getRPCProvider();
         const network = await provider.getNetwork();
         const networkName = EXPECTED_NETWORKS[Number(network.chainId)] || 'Unknown Network';
 

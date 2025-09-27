@@ -14,6 +14,10 @@
 import { ethers } from 'ethers';
 import path from 'path';
 import fs from 'fs';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 const RPC_URL = process.env.RPC_URL || 'http://localhost:8545';
 const VOTING_ADDRESS = process.env.VOTING_ADDRESS || process.env.NEXT_PUBLIC_VOTING_ADDRESS;

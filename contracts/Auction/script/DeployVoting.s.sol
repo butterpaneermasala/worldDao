@@ -36,10 +36,16 @@ contract DeployVoting is Script {
         }
         Voting voting = new Voting(minter, auction, emptyPngs);
 
-        // 3.5) Set custom durations after deployment (only works on local chain)
-        uint256 uploadDur = vm.envUint("UPLOAD_DURATION") > 0 ? vm.envUint("UPLOAD_DURATION") : 1 days;
-        uint256 votingDur = vm.envUint("VOTING_DURATION") > 0 ? vm.envUint("VOTING_DURATION") : 1 days;
-        uint256 biddingDur = vm.envUint("BIDDING_DURATION") > 0 ? vm.envUint("BIDDING_DURATION") : 1 days;
+        // 3.5) Set custom durations after deployment (better for testing)
+        uint256 uploadDur = vm.envUint("UPLOAD_DURATION") > 0
+            ? vm.envUint("UPLOAD_DURATION")
+            : 10 minutes; // 600 seconds
+        uint256 votingDur = vm.envUint("VOTING_DURATION") > 0
+            ? vm.envUint("VOTING_DURATION")
+            : 15 minutes; // 900 seconds
+        uint256 biddingDur = vm.envUint("BIDDING_DURATION") > 0
+            ? vm.envUint("BIDDING_DURATION")
+            : 10 minutes; // 600 seconds
         voting.setDurations(uploadDur, votingDur, biddingDur);
 
         // 3.6) Set operator (relayer) for off-chain finalization

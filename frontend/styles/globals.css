@@ -1,3 +1,159 @@
+/* Import component styles */
+@import './components/voting-gallery.css';
+@import './components/auction.css';
+
+/* Contract Status Styles */
+.contract-status {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 15px;
+  margin: 10px 0;
+}
+
+.contract-status h3 {
+  color: white;
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+}
+
+.contract-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.contract-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 5px;
+  font-size: 0.8rem;
+}
+
+.contract-item.deployed {
+  background: rgba(0, 255, 136, 0.1);
+  border: 1px solid rgba(0, 255, 136, 0.3);
+}
+
+.contract-item.not-deployed {
+  background: rgba(255, 107, 107, 0.1);
+  border: 1px solid rgba(255, 107, 107, 0.3);
+}
+
+.contract-name {
+  font-weight: bold;
+  color: white;
+}
+
+.contract-status-text {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.contract-address {
+  font-family: 'Courier New', monospace;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.6);
+  grid-column: 1 / -1;
+}
+
+.contract-error {
+  color: #ff6b6b;
+  font-size: 0.7rem;
+  grid-column: 1 / -1;
+}
+
+.contract-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.refresh-contracts,
+.check-deployments {
+  flex: 1;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 5px;
+  color: white;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.refresh-contracts:hover,
+.check-deployments:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.check-deployments:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.deployment-comparison {
+  margin-top: 15px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 5px;
+}
+
+.deployment-comparison h4 {
+  color: white;
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+}
+
+.deployment-error {
+  color: #ff6b6b;
+  font-size: 0.8rem;
+}
+
+.comparison-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.comparison-item {
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.comparison-item.up-to-date {
+  background: rgba(0, 255, 136, 0.1);
+  border: 1px solid rgba(0, 255, 136, 0.3);
+}
+
+.comparison-item.needs-update {
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.comparison-name {
+  font-weight: bold;
+  color: white;
+  margin-bottom: 3px;
+}
+
+.comparison-status {
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 5px;
+}
+
+.comparison-addresses {
+  font-family: 'Courier New', monospace;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.comparison-addresses div {
+  margin: 2px 0;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
