@@ -3,7 +3,18 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "compile": "npx hardhat compile",
+    "test": "npx hardhat test",
+    "test:comprehensive": "npx hardhat test test/Treasury.comprehensive.test.ts",
+    "test:coverage": "npx hardhat coverage",
+    "test:gas": "REPORT_GAS=true npx hardhat test",
+    "deploy:local": "npx hardhat run ignition/modules/deploy.ts --network localhost",
+    "deploy:testnet": "npx hardhat run ignition/modules/deploy.ts --network worldchainSepolia",
+    "deploy:mainnet": "npx hardhat run ignition/modules/deploy.ts --network worldchain",
+    "verify": "npx hardhat verify --network",
+    "clean": "npx hardhat clean",
+    "node": "npx hardhat node",
+    "size": "npx hardhat size-contracts"
   },
   "keywords": [],
   "author": "",
@@ -30,5 +41,9 @@
     "ts-node": "^10.9.2",
     "typechain": "^8.3.2",
     "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.4.0",
+    "dotenv": "^17.2.2"
   }
 }

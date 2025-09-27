@@ -1,28 +1,35 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { Contract, Signer } from "ethers";
-import { Treasury, Treasury__factory } from "../typechain-types";
+import { Signer } from "ethers";
+import { Treasury } from "../typechain-types";
 
-describe("Treasury", function () {
+describe("Treasury Contract", function () {
     let treasury: Treasury;
     let owner: Signer;
     let governor: Signer;
     let newGovernor: Signer;
     let user: Signer;
-    let mockTarget: Contract;
+    let attacker: Signer;
+    let mockTarget: any;
+    let mockToken: any;
 
     beforeEach(async function () {
-        [owner, governor, newGovernor, user] = await ethers.getSigners();
+        [owner, governor, newGovernor, user, attacker] = await ethers.getSigners();
 
         // Deploy Treasury contract
         const Treasury = await ethers.getContractFactory("Treasury");
         treasury = await Treasury.deploy(await governor.getAddress());
         await treasury.waitForDeployment();
 
-        // Deploy a mock contract for testing executeTransaction
+        // Deploy mock contracts for testing
         const MockTarget = await ethers.getContractFactory("MockTarget");
         mockTarget = await MockTarget.deploy();
         await mockTarget.waitForDeployment();
+
+        // Deploy a simple ERC20 mock token
+        const MockToken = await ethers.getContractFactory("MockToken");
+        mockToken = await MockToken.deploy("MockToken", "MTK", ethers.parseEther("1000"));
+        await mockToken.waitForDeployment();
     });
 
     describe("Deployment", function () {
