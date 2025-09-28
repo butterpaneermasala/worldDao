@@ -78,7 +78,7 @@ export default function GovernancePage() {
     useEffect(() => {
         // Check user permissions when wallet connection changes
         checkUserPermissions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isConnected, address]);
 
     return (

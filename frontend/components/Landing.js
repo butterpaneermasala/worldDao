@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { 
-  initMiniKit, 
-  isMiniKitReady, 
+import {
+  initMiniKit,
+  isMiniKitReady,
   verifyForGovernance,
   getMiniKitStatus,
-  connectWallet 
+  connectWallet
 } from '@/lib/web3';
 
 export default function Landing() {
@@ -28,17 +28,17 @@ export default function Landing() {
 
   const handleDiveInClick = async () => {
     setIsVerifying(true);
-    
+
     try {
       // Check if we're in World App
       const status = getMiniKitStatus();
-      
+
       if (status.isWorldApp && miniKitReady) {
         console.log('🌍 Verifying with World ID...');
-        
+
         // Use MiniKit verify function for World ID verification
         const verificationResult = await verifyForGovernance('access_dao', 'landing_entry');
-        
+
         if (verificationResult && verificationResult.proof) {
           console.log('✅ World ID verification successful');
           // Navigate to dashboard after successful verification
@@ -50,7 +50,7 @@ export default function Landing() {
         }
       } else {
         console.log('🔗 Not in World App, connecting wallet...');
-        
+
         // For regular browsers, connect wallet first
         try {
           await connectWallet();
@@ -75,8 +75,8 @@ export default function Landing() {
       <div className="content">
         <h1 className="title">worldDao</h1>
         <p className="subtitle">Enter the decentralized future</p>
-        <button 
-          className="dive-button" 
+        <button
+          className="dive-button"
           onClick={handleDiveInClick}
           disabled={isVerifying}
         >
