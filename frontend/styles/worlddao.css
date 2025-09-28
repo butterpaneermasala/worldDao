@@ -402,6 +402,28 @@ code {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), 0 0 10px rgba(255, 255, 255, 0.1);
 }
 
+.dive-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.dive-button:disabled:hover {
+  background: linear-gradient(45deg, #333, #555);
+  border-color: #666;
+  transform: none;
+  box-shadow: none;
+}
+
+.world-app-indicator {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 0.7rem;
+  color: #4CAF50;
+  margin-top: 1rem;
+  text-align: center;
+  opacity: 0.8;
+}
+
 .background-pattern {
   position: absolute;
   top: 0;
