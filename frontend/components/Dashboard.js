@@ -4,11 +4,17 @@ import { AppContext } from '@/pages/_app';
 import NftGallery from '@/components/dashboard/NftGallery';
 import VotingGallery from '@/components/dashboard/VotingGallery';
 import AuctionResults from '@/components/dashboard/AuctionResults';
-import ContractStatus from '@/components/ContractStatus';
 import UploadModal from '@/components/dashboard/UploadModal';
 import FullscreenGallery from '@/components/dashboard/FullscreenGallery';
 import { useEffect } from 'react';
-import { getProvider, getSigner, getContract } from '@/lib/web3';
+import {
+  getProvider,
+  getSigner,
+  getContract,
+  getMiniKitStatus,
+  initMiniKit,
+  checkWalletConnection
+} from '@/lib/web3';
 import { useAccount } from 'wagmi';
 
 export default function Dashboard() {
@@ -222,8 +228,7 @@ export default function Dashboard() {
         {isConnected && <span className="connected-indicator">✓ Connected: {address?.slice(0, 6)}...{address?.slice(-4)}</span>}
       </div>
 
-      {/* Contract Status */}
-      <ContractStatus />
+
 
       <div className="dashboard-main">
         {/* Auction Section */}
@@ -281,7 +286,7 @@ export default function Dashboard() {
       <div className="dashboard-section governance-section">
         <div className="governance-section-content">
           <div className="governance-title">🏛️ governance hub</div>
-          <div className="governance-subtitle">shape the dao's future</div>
+          <div className="governance-subtitle">shape the dao&apos;s future</div>
           <div className="governance-options">
             <div
               className="governance-option candidate-option"
@@ -310,6 +315,7 @@ export default function Dashboard() {
             </button>
           </div>
         </div>
+
       </div>
 
       {showUploadModal && (

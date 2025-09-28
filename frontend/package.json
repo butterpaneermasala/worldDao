@@ -7,7 +7,9 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "extract-abis": "node scripts/extract-abis.cjs",
+    "compile-all": "cd ../contracts/Auction && forge build && cd ../world-governor && npx hardhat compile && cd ../world-treasure && npx hardhat compile && cd ../../frontend && npm run extract-abis"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.2",

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { AppContext } from '@/pages/_app';
 import { useAccount } from 'wagmi';
 import { getSigner, getContract } from '@/lib/web3';
+import NFTOwnershipChecker from './NFTOwnershipChecker';
 
 export default function Voting() {
   const { items, setItems, pinataConfig } = useContext(AppContext);
@@ -10,6 +11,7 @@ export default function Voting() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [voting, setVoting] = useState(false);
+  const [showNFTChecker, setShowNFTChecker] = useState(false);
 
   const handleVote = async (proposalIndex) => {
     if (!isConnected) {
@@ -62,6 +64,12 @@ export default function Voting() {
       <div className="fullscreen-topbar">
         <div className="right-title">voting page</div>
         <div className="topbar-controls">
+          <button
+            className="nft-check-button"
+            onClick={() => setShowNFTChecker(!showNFTChecker)}
+          >
+            {showNFTChecker ? 'Hide' : 'Check'} NFT Status
+          </button>
           <w3m-button />
           <Link className="close-button" href="/dashboard">close</Link>
         </div>
@@ -74,47 +82,52 @@ export default function Voting() {
           <w3m-button />
         </div>
       ) : (
-        <div className="nft-gallery fullscreen">
-          {loading ? (
-            <div className="placeholder-text">loading proposals...</div>
-          ) : error ? (
-            <div className="placeholder-text">Error: {error}</div>
-          ) : items.length > 0 ? (
-            items.map((it, idx) => (
-              <div key={idx} className="nft-thumb-card voteable">
-                <div className="nft-thumb-frame">
-                  <img
-                    src={it.url}
-                    alt={it.name || `nft-${idx}`}
-                    className="nft-thumb-image"
-                    onError={(e) => {
-                      // Fallback to direct gateway URL using CID if proxy fails
-                      if (it.cid) {
-                        e.currentTarget.onerror = null;
-                        const gw = pinataConfig.gatewayBase || 'https://gateway.pinata.cloud/ipfs/';
-                        e.currentTarget.src = `${gw}${it.cid}`;
-                      }
-                    }}
-                  />
+        <div className="voting-container">
+          {showNFTChecker && <NFTOwnershipChecker />}
+
+          <div className="nft-gallery fullscreen">
+            {loading ? (
+              <div className="placeholder-text">loading proposals...</div>
+            ) : error ? (
+              <div className="placeholder-text">Error: {error}</div>
+            ) : items.length > 0 ? (
+              items.map((it, idx) => (
+                <div key={idx} className="nft-thumb-card voteable">
+                  <div className="nft-thumb-frame">
+                    <img
+                      src={it.url}
+                      alt={it.name || `nft-${idx}`}
+                      className="nft-thumb-image"
+                      onError={(e) => {
+                        // Fallback to direct gateway URL using CID if proxy fails
+                        if (it.cid) {
+                          e.currentTarget.onerror = null;
+                          const gw = pinataConfig.gatewayBase || 'https://gateway.pinata.cloud/ipfs/';
+                          e.currentTarget.src = `${gw}${it.cid}`;
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="nft-info">
+                    <div className="nft-name">{it.name || `Proposal ${idx + 1}`}</div>
+                    <div className="proposal-slot">Slot: {it.index || idx}</div>
+                    {it.votes !== undefined && (
+                      <div className="vote-count">Votes: {it.votes}</div>
+                    )}
+                  </div>
+                  <button
+                    className="vote-button"
+                    onClick={() => handleVote(it.index)}
+                    disabled={voting}
+                  >
+                    {voting ? 'Voting...' : 'Vote'}
+                  </button>
                 </div>
-                <div className="nft-info">
-                  <div className="nft-name">{it.name || `NFT ${idx + 1}`}</div>
-                  {it.votes !== undefined && (
-                    <div className="vote-count">Votes: {it.votes}</div>
-                  )}
-                </div>
-                <button
-                  className="vote-button"
-                  onClick={() => handleVote(it.index)}
-                  disabled={voting}
-                >
-                  {voting ? 'Voting...' : 'Vote'}
-                </button>
-              </div>
-            ))
-          ) : (
-            <div className="placeholder-text">no proposals available</div>
-          )}
+              ))
+            ) : (
+              <div className="placeholder-text">no proposals available</div>
+            )}
+          </div>
         </div>
       )}
     </div>

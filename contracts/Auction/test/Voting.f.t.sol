@@ -4,8 +4,9 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 import {NFTMinter} from "../src/NFTMinter.sol";
 import {NFTAuction} from "../src/Auction.sol";
-import {Voting} from "../src/Voting.sol";
+import {Voting, ITreasury} from "../src/Voting.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {MockTreasury} from "./mocks/MockTreasury.sol";
 
 contract VotingFuzzTest is Test {
     address deployer = address(0xD3B10);
@@ -22,10 +23,16 @@ contract VotingFuzzTest is Test {
 
         // default: no seeds -> starts Uploading phase
         vm.startPrank(deployer);
+        MockTreasury treasury = new MockTreasury(deployer);
         minter = new NFTMinter("DailyNFT", "DNFT", deployer);
         auction = new NFTAuction(deployer, payable(beneficiary));
         string[20] memory empty;
-        voting = new Voting(minter, auction, empty);
+        voting = new Voting(
+            minter,
+            auction,
+            ITreasury(address(treasury)),
+            empty
+        );
         // wire ownership/operator
         minter.transferOwnership(address(voting));
         auction.setOperator(address(voting));
@@ -33,7 +40,10 @@ contract VotingFuzzTest is Test {
     }
 
     // Fuzz: proposing requires uploading phase and non-empty svg
-    function testFuzz_ProposeRequiresUploadingAndNonEmpty(string memory tokenURI, string memory svg) public {
+    function testFuzz_ProposeRequiresUploadingAndNonEmpty(
+        string memory tokenURI,
+        string memory svg
+    ) public {
         // At start: Uploading phase, empty proposals
         if (bytes(svg).length == 0) {
             vm.expectRevert(bytes("svg required"));
@@ -47,24 +57,24 @@ contract VotingFuzzTest is Test {
 
     // Unit: automation from Uploading -> Voting when at least 1 proposal exists, extends otherwise
     function test_AutomationTransitionsUploadingToVoting() public {
-        (Voting.Phase phase,) = voting.currentPhaseInfo();
+        (Voting.Phase phase, ) = voting.currentPhaseInfo();
         assertEq(uint256(phase), uint256(Voting.Phase.Uploading));
         uint256 oldEnd;
-        ( , oldEnd) = voting.currentPhaseInfo();
+        (, oldEnd) = voting.currentPhaseInfo();
 
         // Without proposals, performUpkeep should extend uploading
         vm.warp(oldEnd + 1);
         voting.performUpkeep("");
-        (phase,) = voting.currentPhaseInfo();
+        (phase, ) = voting.currentPhaseInfo();
         assertEq(uint256(phase), uint256(Voting.Phase.Uploading));
 
         // Add a proposal then performUpkeep to move to Voting
         voting.propose("ipfs://x", "AA==");
         uint256 endBefore;
-        ( , endBefore) = voting.currentPhaseInfo();
+        (, endBefore) = voting.currentPhaseInfo();
         vm.warp(endBefore + 1);
         voting.performUpkeep("");
-        (phase,) = voting.currentPhaseInfo();
+        (phase, ) = voting.currentPhaseInfo();
         assertEq(uint256(phase), uint256(Voting.Phase.Voting));
     }
 
@@ -72,11 +82,11 @@ contract VotingFuzzTest is Test {
     function testFuzz_VoteOnceAndValidId(uint8 idx) public {
         uint256 count = 3;
         // Seed three proposals
-        voting.propose("u1","AA==");
-        voting.propose("u2","AA==");
-        voting.propose("u3","AA==");
+        voting.propose("u1", "AA==");
+        voting.propose("u2", "AA==");
+        voting.propose("u3", "AA==");
         // move to Voting
-        ( , uint256 endUpload) = voting.currentPhaseInfo();
+        (, uint256 endUpload) = voting.currentPhaseInfo();
         vm.warp(endUpload + 1);
         voting.performUpkeep("");
         // bound idx to [0, count-1]
@@ -91,22 +101,22 @@ contract VotingFuzzTest is Test {
     // Unit: finalize mints and starts auction, then Bidding->Uploading cycles
     function test_FinalizeMintsAndStartsAuctionThenCycles() public {
         // seed
-        voting.propose("u","AA==");
-        ( , uint256 endUpload) = voting.currentPhaseInfo();
+        voting.propose("u", "AA==");
+        (, uint256 endUpload) = voting.currentPhaseInfo();
         vm.warp(endUpload + 1);
         voting.performUpkeep(""); // open voting
         // cast a vote to ensure a winner exists
         voting.voteIndex(0);
-        ( , uint256 endVote) = voting.currentPhaseInfo();
+        (, uint256 endVote) = voting.currentPhaseInfo();
         vm.warp(endVote + 1);
         voting.performUpkeep(""); // finalize -> bidding
         // auction should be active now
         assertTrue(auction.auctionActive());
         // move past bidding end
-        ( , uint256 endBid) = voting.currentPhaseInfo();
+        (, uint256 endBid) = voting.currentPhaseInfo();
         vm.warp(endBid + 1);
         voting.performUpkeep(""); // cycle back to uploading
-        (Voting.Phase phase,) = voting.currentPhaseInfo();
+        (Voting.Phase phase, ) = voting.currentPhaseInfo();
         assertEq(uint256(phase), uint256(Voting.Phase.Uploading));
     }
 }

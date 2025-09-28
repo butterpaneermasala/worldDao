@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Script.sol";
 import {NFTMinter} from "../src/NFTMinter.sol";
-import {Voting} from "../src/Voting.sol";
+import {Voting, ITreasury} from "../src/Voting.sol";
 import {NFTAuction} from "../src/Auction.sol";
 
 contract DeployVoting is Script {
@@ -26,15 +26,38 @@ contract DeployVoting is Script {
 
         NFTMinter minter = new NFTMinter(NAME, SYMBOL, deployer);
 
-        // 2) Deploy NFTAuction with temporary operator = deployer; beneficiary = deployer (adjust if needed)
-        NFTAuction auction = new NFTAuction(deployer, payable(deployer));
+        // 2) Get Treasury address and validate it
+        address treasuryAddress;
+        try vm.envAddress("TREASURY_ADDRESS") returns (address treasury) {
+            treasuryAddress = treasury;
+            console2.log("Using Treasury address:", treasury);
 
-        // 3) Deploy Voting with the minter, auction, and 20 initial base64 strings (empty by default)
+            // Validate Treasury contract
+            ITreasury treasuryContract = ITreasury(treasury);
+            try treasuryContract.governor() returns (address gov) {
+                console2.log("Treasury governor:", gov);
+                require(gov != address(0), "Treasury not properly initialized");
+            } catch {
+                console2.log("WARNING: Could not validate Treasury contract");
+            }
+        } catch {
+            revert("TREASURY_ADDRESS environment variable is required");
+        }
+
+        // 3) Deploy NFTAuction with deployer as temporary operator; Treasury as beneficiary
+        NFTAuction auction = new NFTAuction(deployer, payable(treasuryAddress));
+
+        // 4) Deploy Voting with the minter, auction, treasury, and 20 initial base64 strings
         string[20] memory emptyPngs;
         for (uint256 i = 0; i < 20; i++) {
             emptyPngs[i] = "";
         }
-        Voting voting = new Voting(minter, auction, emptyPngs);
+        Voting voting = new Voting(
+            minter,
+            auction,
+            ITreasury(treasuryAddress),
+            emptyPngs
+        );
 
         // 3.5) Set custom durations after deployment (better for testing)
         uint256 uploadDur = vm.envUint("UPLOAD_DURATION") > 0
@@ -61,17 +84,37 @@ contract DeployVoting is Script {
         }
         voting.setOperator(relayer);
 
-        // 4) Transfer ownership of the minter to Voting so it can mint
+        // 6) Transfer ownership of the minter to Voting so it can mint
         minter.transferOwnership(address(voting));
 
-        // 5) Set the auction operator to Voting so it can start auctions after finalization
+        // 7) Set the auction operator to Voting so it can start auctions after finalization
         auction.setOperator(address(voting));
+
+        // 8) Configure Treasury as auction beneficiary through Voting contract
+        voting.configureTreasuryBeneficiary();
+
+        // 9) Verify final configuration
+        console2.log("Final verification:");
+        console2.log("  Auction beneficiary:", auction.beneficiary());
+        console2.log("  Expected (Treasury):", treasuryAddress);
+        require(
+            auction.beneficiary() == treasuryAddress,
+            "Beneficiary not properly set"
+        );
+
         vm.stopBroadcast();
 
+        console2.log("\n=== DEPLOYMENT SUMMARY ===");
         console2.log("Deployer:", deployer);
         console2.log("NFTMinter:", address(minter));
         console2.log("NFTAuction:", address(auction));
+        console2.log("Treasury:", treasuryAddress);
         console2.log("Voting:", address(voting));
         console2.log("Relayer (operator):", relayer);
+        console2.log("\n=== INTEGRATION STATUS ===");
+        console2.log("[SUCCESS] Auction proceeds go to Treasury");
+        console2.log("[SUCCESS] Voting controls auction lifecycle");
+        console2.log("[SUCCESS] NFTMinter owned by Voting contract");
+        console2.log("[SUCCESS] Treasury integration complete");
     }
 }

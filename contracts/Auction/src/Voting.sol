@@ -7,6 +7,12 @@ import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {NFTAuction} from "./Auction.sol";
 
+/// @notice Interface for Treasury contract
+interface ITreasury {
+    function getETHBalance() external view returns (uint256);
+    function governor() external view returns (address);
+}
+
 contract Voting is AutomationCompatibleInterface, IERC721Receiver {
     // --- Fixed slot voting (20 indices: 0..19) ---
     uint8 public constant SLOT_COUNT = 20;
@@ -16,6 +22,12 @@ contract Voting is AutomationCompatibleInterface, IERC721Receiver {
     /// @notice Set the off-chain operator/relayer authorized to finalize with the winning SVG
     function setOperator(address _op) external onlyAdmin {
         operator = _op;
+    }
+
+    /// @notice Configure auction to use Treasury as beneficiary (only admin)
+    function configureTreasuryBeneficiary() external onlyAdmin {
+        auction.setBeneficiary(payable(address(treasury)));
+        emit TreasuryConfigured(address(treasury));
     }
 
     /// @notice Finalize the voting with an off-chain computed winner and start the on-chain auction
@@ -31,6 +43,12 @@ contract Voting is AutomationCompatibleInterface, IERC721Receiver {
         // Validate winnerIndex matches on-chain tallies with tie-break
         uint8 computed = _computeWinnerIndex();
         require(winnerIndex == computed, "wrong winner index");
+
+        // Ensure Treasury is properly configured as beneficiary
+        require(
+            auction.beneficiary() == address(treasury),
+            "Treasury not configured as beneficiary"
+        );
 
         uint256 tokenId = minter.mintWithSVG(address(this), svgBase64);
         emit Finalized(0, winnerIndex, tallies[winnerIndex], tokenId, tokenURI);
@@ -144,7 +162,7 @@ contract Voting is AutomationCompatibleInterface, IERC721Receiver {
     Phase public currentPhase;
     uint256 public phaseEnd; // UTC timestamp for end of current phase
 
-    // durations (seconds) — default 1 day each; configurable only on local dev chain
+    // durations (seconds) - default 1 day each; configurable only on local dev chain
     uint256 public uploadDuration = 1 days;
     uint256 public votingDuration = 1 days;
     uint256 public biddingDuration = 1 days;
@@ -162,6 +180,8 @@ contract Voting is AutomationCompatibleInterface, IERC721Receiver {
     NFTMinter public immutable minter;
     // Auction contract that will auction the freshly minted NFT
     NFTAuction public immutable auction;
+    // Treasury contract that receives auction proceeds
+    ITreasury public immutable treasury;
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Not admin");
@@ -188,18 +208,31 @@ contract Voting is AutomationCompatibleInterface, IERC721Receiver {
         string winningTokenURI
     );
     event PhaseChanged(Phase phase, uint256 phaseEnd);
+    event TreasuryConfigured(address indexed treasury);
 
     /// @notice Constructor; starts Uploading phase.
     constructor(
         NFTMinter _minter,
         NFTAuction _auction,
+        ITreasury _treasury,
         string[20] memory /*_candidateBase64*/
     ) {
         minter = _minter;
         auction = _auction;
+        treasury = _treasury;
         admin = msg.sender;
         operator = address(0);
         // Start in Uploading phase for one day (off-chain submissions expected)
+        admin = msg.sender;
+
+        // Validate Treasury contract
+        require(address(_treasury) != address(0), "Invalid treasury");
+        require(_treasury.governor() != address(0), "Treasury not initialized");
+
+        // Configure auction to send proceeds to Treasury
+        // Note: This requires the auction operator to be this Voting contract
+
+        // Start in Uploading phase with initial duration
         currentPhase = Phase.Uploading;
         phaseEnd = block.timestamp + uploadDuration;
         emit PhaseChanged(currentPhase, phaseEnd);

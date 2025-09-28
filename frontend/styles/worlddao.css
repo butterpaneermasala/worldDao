@@ -48,6 +48,35 @@ code {
   position: relative;
 }
 
+/* NFT Ownership Checker Styles */
+.nft-check-button {
+  background: #4CAF50;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  font-family: 'Press Start 2P', cursive;
+  font-size: 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  margin-right: 10px;
+  transition: background-color 0.3s;
+}
+
+.nft-check-button:hover {
+  background: #45a049;
+}
+
+.voting-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.proposal-slot {
+  color: #888;
+  font-size: 10px;
+  margin: 2px 0;
+}
+
 /* Panel hover overlay and blur */
 .panel {
   position: relative;

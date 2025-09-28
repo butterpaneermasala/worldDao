@@ -72,48 +72,109 @@ export default function GovernanceSections({ userOwnsNFT = false, initialTab = '
                 return;
             }
 
-            const provider = getProvider();
+            // Try multiple provider strategies
+            let provider = null;
+            let providerType = '';
 
-            // Check network
-            const network = await provider.getNetwork();
-            console.log('Connected to network:', Number(network.chainId));
+            try {
+                provider = getProvider();
+                providerType = 'wallet';
+                console.log('Using wallet provider for candidates');
+            } catch (error) {
+                console.warn('Wallet provider failed, trying RPC provider:', error.message);
+                try {
+                    const { getRPCProvider } = require('@/lib/web3');
+                    provider = getRPCProvider();
+                    providerType = 'rpc';
+                    console.log('Using RPC provider for candidates');
+                } catch (rpcError) {
+                    console.error('Both wallet and RPC providers failed:', rpcError.message);
+                    setIsDemoMode(true);
+                    setCandidates(demoData.candidates);
+                    return;
+                }
+            }
 
-            const candidateContract = await getCandidateContract(provider);
+            // Check network if possible
+            try {
+                const network = await provider.getNetwork();
+                console.log('Connected to network:', Number(network.chainId));
+            } catch (networkError) {
+                console.warn('Could not detect network:', networkError.message);
+            }
 
-            // Check if contract exists by trying to get the code
-            const code = await provider.getCode(process.env.NEXT_PUBLIC_CANDIDATE_ADDRESS);
-            if (code === '0x') {
-                console.warn('Candidate contract not deployed - using demo data');
+            // Check if contract exists
+            try {
+                const code = await provider.getCode(process.env.NEXT_PUBLIC_CANDIDATE_ADDRESS);
+                if (code === '0x') {
+                    console.warn('Candidate contract not deployed - using demo data');
+                    setIsDemoMode(true);
+                    setCandidates(demoData.candidates);
+                    return;
+                }
+            } catch (codeError) {
+                console.warn('Could not check contract deployment - using demo data:', codeError.message);
                 setIsDemoMode(true);
                 setCandidates(demoData.candidates);
                 return;
             }
 
-            const candidateCount = await candidateContract.candidateCount();
-            console.log('Candidate count:', Number(candidateCount));
-
-            if (Number(candidateCount) === 0) {
-                setCandidates([]);
+            // Try to get contract instance
+            let candidateContract;
+            try {
+                candidateContract = await getCandidateContract(provider);
+            } catch (contractError) {
+                console.warn('Could not create candidate contract instance - using demo data:', contractError.message);
+                setIsDemoMode(true);
+                setCandidates(demoData.candidates);
                 return;
             }
 
-            const candidatePromises = [];
-            for (let i = 1; i <= Number(candidateCount); i++) {
-                candidatePromises.push(candidateContract.candidates(i));
+            // Try to get candidate count
+            let candidateCount;
+            try {
+                candidateCount = await candidateContract.candidateCount();
+                console.log('Candidate count:', Number(candidateCount));
+            } catch (countError) {
+                console.warn('Could not get candidate count - using demo data:', countError.message);
+                setIsDemoMode(true);
+                setCandidates(demoData.candidates);
+                return;
             }
 
-            const candidateData = await Promise.all(candidatePromises);
-            const formattedCandidates = candidateData.map((candidate) => ({
-                id: Number(candidate.id),
-                proposer: candidate.proposer,
-                description: candidate.description,
-                sponsorCount: Number(candidate.sponsorCount),
-                promoted: candidate.promoted,
-            }));
-            setCandidates(formattedCandidates);
+            if (Number(candidateCount) === 0) {
+                setCandidates([]);
+                setIsDemoMode(false);
+                return;
+            }
+
+            // Try to load candidate data
+            try {
+                const candidatePromises = [];
+                for (let i = 1; i <= Number(candidateCount); i++) {
+                    candidatePromises.push(candidateContract.candidates(i));
+                }
+
+                const candidateData = await Promise.all(candidatePromises);
+                const formattedCandidates = candidateData.map((candidate) => ({
+                    id: Number(candidate.id),
+                    proposer: candidate.proposer,
+                    description: candidate.description,
+                    sponsorCount: Number(candidate.sponsorCount),
+                    promoted: candidate.promoted,
+                }));
+                setCandidates(formattedCandidates);
+                setIsDemoMode(false);
+            } catch (dataError) {
+                console.warn('Could not load candidate data - using demo data:', dataError.message);
+                setIsDemoMode(true);
+                setCandidates(demoData.candidates);
+            }
+
         } catch (error) {
             console.error('Failed to load candidates:', error);
-            setCandidates([]);
+            setIsDemoMode(true);
+            setCandidates(demoData.candidates);
         } finally {
             setLoading(false);
         }
@@ -131,52 +192,113 @@ export default function GovernanceSections({ userOwnsNFT = false, initialTab = '
                 return;
             }
 
-            const provider = getProvider();
+            // Try multiple provider strategies
+            let provider = null;
+            let providerType = '';
 
-            // Check network
-            const network = await provider.getNetwork();
-            console.log('Connected to network:', Number(network.chainId));
+            try {
+                provider = getProvider();
+                providerType = 'wallet';
+                console.log('Using wallet provider for proposals');
+            } catch (error) {
+                console.warn('Wallet provider failed, trying RPC provider:', error.message);
+                try {
+                    const { getRPCProvider } = require('@/lib/web3');
+                    provider = getRPCProvider();
+                    providerType = 'rpc';
+                    console.log('Using RPC provider for proposals');
+                } catch (rpcError) {
+                    console.error('Both wallet and RPC providers failed:', rpcError.message);
+                    setIsDemoMode(true);
+                    setProposals(demoData.proposals);
+                    return;
+                }
+            }
 
-            const governorContract = await getGovernorContract(provider);
+            // Check network if possible
+            try {
+                const network = await provider.getNetwork();
+                console.log('Connected to network:', Number(network.chainId));
+            } catch (networkError) {
+                console.warn('Could not detect network:', networkError.message);
+            }
 
             // Check if contract exists
-            const code = await provider.getCode(process.env.NEXT_PUBLIC_GOVERNOR_ADDRESS);
-            if (code === '0x') {
-                console.warn('Governor contract not deployed - using demo data');
+            try {
+                const code = await provider.getCode(process.env.NEXT_PUBLIC_GOVERNOR_ADDRESS);
+                if (code === '0x') {
+                    console.warn('Governor contract not deployed - using demo data');
+                    setIsDemoMode(true);
+                    setProposals(demoData.proposals);
+                    return;
+                }
+            } catch (codeError) {
+                console.warn('Could not check governor contract deployment - using demo data:', codeError.message);
                 setIsDemoMode(true);
                 setProposals(demoData.proposals);
                 return;
             }
 
-            const proposalCount = await governorContract.proposalCount();
-            console.log('Proposal count:', Number(proposalCount));
-
-            if (Number(proposalCount) === 0) {
-                setProposals([]);
+            // Try to get contract instance
+            let governorContract;
+            try {
+                governorContract = await getGovernorContract(provider);
+            } catch (contractError) {
+                console.warn('Could not create governor contract instance - using demo data:', contractError.message);
+                setIsDemoMode(true);
+                setProposals(demoData.proposals);
                 return;
             }
 
-            const proposalPromises = [];
-            for (let i = 1; i <= Number(proposalCount); i++) {
-                proposalPromises.push(governorContract.getProposal(i));
+            // Try to get proposal count
+            let proposalCount;
+            try {
+                proposalCount = await governorContract.proposalCount();
+                console.log('Proposal count:', Number(proposalCount));
+            } catch (countError) {
+                console.warn('Could not get proposal count - using demo data:', countError.message);
+                setIsDemoMode(true);
+                setProposals(demoData.proposals);
+                return;
             }
 
-            const proposalData = await Promise.all(proposalPromises);
-            const formattedProposals = proposalData.map((proposal) => ({
-                id: Number(proposal.id),
-                proposer: proposal.proposer,
-                description: proposal.description,
-                startBlock: Number(proposal.startBlock),
-                endBlock: Number(proposal.endBlock),
-                forVotes: Number(proposal.forVotes),
-                againstVotes: Number(proposal.againstVotes),
-                abstainVotes: Number(proposal.abstainVotes),
-                state: Number(proposal.state),
-            }));
-            setProposals(formattedProposals);
+            if (Number(proposalCount) === 0) {
+                setProposals([]);
+                setIsDemoMode(false);
+                return;
+            }
+
+            // Try to load proposal data
+            try {
+                const proposalPromises = [];
+                for (let i = 1; i <= Number(proposalCount); i++) {
+                    proposalPromises.push(governorContract.getProposal(i));
+                }
+
+                const proposalData = await Promise.all(proposalPromises);
+                const formattedProposals = proposalData.map((proposal) => ({
+                    id: Number(proposal.id),
+                    proposer: proposal.proposer,
+                    description: proposal.description,
+                    startBlock: Number(proposal.startBlock),
+                    endBlock: Number(proposal.endBlock),
+                    forVotes: Number(proposal.forVotes),
+                    againstVotes: Number(proposal.againstVotes),
+                    abstainVotes: Number(proposal.abstainVotes),
+                    state: Number(proposal.state),
+                }));
+                setProposals(formattedProposals);
+                setIsDemoMode(false);
+            } catch (dataError) {
+                console.warn('Could not load proposal data - using demo data:', dataError.message);
+                setIsDemoMode(true);
+                setProposals(demoData.proposals);
+            }
+
         } catch (error) {
             console.error('Failed to load proposals:', error);
-            setProposals([]);
+            setIsDemoMode(true);
+            setProposals(demoData.proposals);
         } finally {
             setLoading(false);
         }
@@ -267,20 +389,20 @@ export default function GovernanceSections({ userOwnsNFT = false, initialTab = '
         } else {
             loadProposals();
         }
-    }, [activeSection]);
+    }, [activeSection]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Initialize on mount
     useEffect(() => {
         initMiniKit();
         loadCandidates(); // Load initial data
-    }, []);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Update active section when initialTab prop changes
     useEffect(() => {
         if (initialTab && initialTab !== activeSection) {
             setActiveSection(initialTab);
         }
-    }, [initialTab]);
+    }, [initialTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
     return (
         <div className="governance-sections">
@@ -309,18 +431,29 @@ export default function GovernanceSections({ userOwnsNFT = false, initialTab = '
 
             {/* Content Area */}
             <div className="governance-content">
+                {/* Demo Mode Banner */}
+                {isDemoMode && (
+                    <div className="permission-banner demo" style={{
+                        background: 'linear-gradient(135deg, #ffeaa7, #fab1a0)',
+                        color: '#2d3436',
+                        border: '2px solid #e17055'
+                    }}>
+                        🚧 Demo Mode: Contracts unavailable - showing sample data for development
+                    </div>
+                )}
+
                 {/* Permission Banner */}
                 {!address && (
                     <div className="permission-banner warning">
                         ⚠️ Connect your wallet to interact with governance
                     </div>
                 )}
-                {address && !userOwnsNFT && activeSection === 'candidates' && (
+                {address && !userOwnsNFT && activeSection === 'candidates' && !isDemoMode && (
                     <div className="permission-banner info">
                         💡 Anyone can create candidates! NFT holders can sponsor and create proposals.
                     </div>
                 )}
-                {address && userOwnsNFT && (
+                {address && userOwnsNFT && !isDemoMode && (
                     <div className="permission-banner success">
                         ✅ NFT Holder: You can create candidates, sponsor them, and create proposals!
                     </div>

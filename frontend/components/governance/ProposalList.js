@@ -1,243 +1,260 @@
 import React, { useState, useEffect } from 'react';
-import { getProvider, getGovernorContract, getSigner, verifyWithWorldId } from '@/lib/web3';
+import {
+  getProvider,
+  getGovernorContract,
+  getSigner,
+  verifyForVoting,
+  verifyForGovernance,
+  getMiniKitStatus,
+  authenticateWithMiniKit
+} from '@/lib/web3';
 import { ethers } from 'ethers';
 
 const VOTE_CHOICES = {
-    0: 'Against',
-    1: 'For',
-    2: 'Abstain'
+  0: 'Against',
+  1: 'For',
+  2: 'Abstain'
 };
 
 const PROPOSAL_STATES = {
-    0: 'Pending',
-    1: 'Active',
-    2: 'Succeeded',
-    3: 'Defeated',
-    4: 'Executed'
+  0: 'Pending',
+  1: 'Active',
+  2: 'Succeeded',
+  3: 'Defeated',
+  4: 'Executed'
 };
 
 export default function ProposalList() {
-    const [proposals, setProposals] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [voting, setVoting] = useState({});
-    const [executing, setExecuting] = useState({});
+  const [proposals, setProposals] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [voting, setVoting] = useState({});
+  const [executing, setExecuting] = useState({});
 
-    const loadProposals = async () => {
+  const loadProposals = async () => {
+    try {
+      setLoading(true);
+      const provider = getProvider();
+      const governorContract = await getGovernorContract(provider);
+
+      const proposalCount = await governorContract.proposalCount();
+      const proposalPromises = [];
+
+      for (let i = 1; i <= proposalCount; i++) {
+        proposalPromises.push(governorContract.getProposal(i));
+      }
+
+      if (proposalPromises.length === 0) {
+        setProposals([]);
+        return;
+      }
+
+      const proposalData = await Promise.all(proposalPromises);
+
+      const formattedProposals = proposalData.map((proposal, index) => ({
+        id: Number(proposal.id),
+        proposer: proposal.proposer,
+        description: proposal.description,
+        startBlock: Number(proposal.startBlock),
+        endBlock: Number(proposal.endBlock),
+        forVotes: Number(proposal.forVotes),
+        againstVotes: Number(proposal.againstVotes),
+        abstainVotes: Number(proposal.abstainVotes),
+        state: Number(proposal.state),
+        index: index + 1
+      }));
+
+      setProposals(formattedProposals);
+    } catch (error) {
+      console.error('Failed to load proposals:', error);
+      alert('Failed to load proposals: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const vote = async (proposalId, voteChoice) => {
+    try {
+      setVoting(prev => ({ ...prev, [proposalId]: true }));
+
+      const miniKitStatus = getMiniKitStatus();
+
+      // Enhanced MiniKit integration for voting
+      if (miniKitStatus.isWorldApp && miniKitStatus.ready) {
         try {
-            setLoading(true);
-            const provider = getProvider();
-            const governorContract = await getGovernorContract(provider);
+          // Authenticate user first if in World App
+          const authResult = await authenticateWithMiniKit();
 
-            const proposalCount = await governorContract.proposalCount();
-            const proposalPromises = [];
+          // Get World ID verification for voting
+          const worldIdProof = await verifyForVoting(proposalId, voteChoice);
 
-            for (let i = 1; i <= proposalCount; i++) {
-                proposalPromises.push(governorContract.getProposal(i));
-            }
+          // TODO: When contract supports World ID verification, use this:
+          // const tx = await governorContract.voteWithWorldId(
+          //   proposalId, voteChoice, worldIdProof.proof, 
+          //   worldIdProof.merkleRoot, worldIdProof.nullifierHash
+          // );
 
-            if (proposalPromises.length === 0) {
-                setProposals([]);
-                return;
-            }
+          // Store verification data for potential future use
+          // This could be sent to backend or used for analytics
 
-            const proposalData = await Promise.all(proposalPromises);
-
-            const formattedProposals = proposalData.map((proposal, index) => ({
-                id: Number(proposal.id),
-                proposer: proposal.proposer,
-                description: proposal.description,
-                startBlock: Number(proposal.startBlock),
-                endBlock: Number(proposal.endBlock),
-                forVotes: Number(proposal.forVotes),
-                againstVotes: Number(proposal.againstVotes),
-                abstainVotes: Number(proposal.abstainVotes),
-                state: Number(proposal.state),
-                index: index + 1
-            }));
-
-            setProposals(formattedProposals);
-        } catch (error) {
-            console.error('Failed to load proposals:', error);
-            alert('Failed to load proposals: ' + error.message);
-        } finally {
-            setLoading(false);
+        } catch (miniKitError) {
+          // MiniKit enhanced voting failed, continue with standard flow
         }
+      }
+
+      // Get signer and contract (works for both MiniKit and Web3Modal)
+      const signer = await getSigner();
+      const governorContract = await getGovernorContract(signer);
+
+      // Execute the vote transaction
+      const tx = await governorContract.vote(proposalId, voteChoice);
+      console.log('Vote transaction submitted:', tx.hash);
+      await tx.wait();
+
+      await loadProposals();
+      alert('Vote cast successfully!');
+    } catch (error) {
+      console.error('Failed to vote:', error);
+      alert('Failed to vote: ' + error.message);
+    } finally {
+      setVoting(prev => ({ ...prev, [proposalId]: false }));
+    }
+  };
+
+  const executeProposal = async (proposalId) => {
+    try {
+      setExecuting(prev => ({ ...prev, [proposalId]: true }));
+      const signer = await getSigner();
+      const governorContract = await getGovernorContract(signer);
+
+      const tx = await governorContract.execute(proposalId);
+      console.log('Execute transaction submitted:', tx.hash);
+      await tx.wait();
+
+      await loadProposals();
+      alert('Proposal executed successfully!');
+    } catch (error) {
+      console.error('Failed to execute proposal:', error);
+      alert('Failed to execute proposal: ' + error.message);
+    } finally {
+      setExecuting(prev => ({ ...prev, [proposalId]: false }));
+    }
+  };
+
+  const calculateVotePercentages = (proposal) => {
+    const total = proposal.forVotes + proposal.againstVotes + proposal.abstainVotes;
+    if (total === 0) return { for: 0, against: 0, abstain: 0 };
+
+    return {
+      for: Math.round((proposal.forVotes / total) * 100),
+      against: Math.round((proposal.againstVotes / total) * 100),
+      abstain: Math.round((proposal.abstainVotes / total) * 100)
     };
+  };
 
-    const vote = async (proposalId, voteChoice) => {
-        try {
-            setVoting(prev => ({ ...prev, [proposalId]: true }));
-            const signer = await getSigner();
-            const governorContract = await getGovernorContract(signer);
+  useEffect(() => {
+    loadProposals();
+  }, []);
 
-            // Try to vote with World ID verification if available
-            try {
-                const worldIdProof = await verifyWithWorldId(
-                    `vote-${proposalId}`,
-                    `${proposalId}-${voteChoice}`
-                );
+  return (
+    <div className="proposal-list">
+      <div className="proposal-header">
+        <h2>Governance Proposals</h2>
+        <p>Vote on active proposals that shape the future of the DAO</p>
+        <button onClick={loadProposals} disabled={loading} className="refresh-btn">
+          {loading ? 'Loading...' : 'Refresh'}
+        </button>
+      </div>
 
-                // If your contract supports World ID verification, use it here
-                // const tx = await governorContract.voteWithWorldId(
-                //   proposalId, voteChoice, worldIdProof.proof, 
-                //   worldIdProof.merkleRoot, worldIdProof.nullifierHash
-                // );
+      <div className="proposals-grid">
+        {loading ? (
+          <div className="loading">Loading proposals...</div>
+        ) : proposals.length === 0 ? (
+          <div className="no-proposals">
+            No proposals yet. Candidates need to be promoted to become proposals.
+          </div>
+        ) : (
+          proposals.map((proposal) => {
+            const percentages = calculateVotePercentages(proposal);
+            const isActive = proposal.state === 1;
+            const isSucceeded = proposal.state === 2;
+            const canExecute = isSucceeded;
 
-                console.log('World ID verified:', worldIdProof);
-            } catch (worldIdError) {
-                console.log('World ID not available, using regular vote:', worldIdError.message);
-            }
+            return (
+              <div key={proposal.id} className={`proposal-card state-${proposal.state}`}>
+                <div className="proposal-header">
+                  <span className="proposal-id">Proposal #{proposal.id}</span>
+                  <span className={`proposal-status status-${proposal.state}`}>
+                    {PROPOSAL_STATES[proposal.state]}
+                  </span>
+                </div>
 
-            // Regular vote (fallback or main method)
-            const tx = await governorContract.vote(proposalId, voteChoice);
-            console.log('Vote transaction submitted:', tx.hash);
-            await tx.wait();
+                <div className="proposal-content">
+                  <p className="description">{proposal.description}</p>
 
-            await loadProposals();
-            alert('Vote cast successfully!');
-        } catch (error) {
-            console.error('Failed to vote:', error);
-            alert('Failed to vote: ' + error.message);
-        } finally {
-            setVoting(prev => ({ ...prev, [proposalId]: false }));
-        }
-    };
+                  <div className="proposal-meta">
+                    <small>Proposer: {proposal.proposer.slice(0, 6)}...{proposal.proposer.slice(-4)}</small>
+                    <small>Blocks: {proposal.startBlock} → {proposal.endBlock}</small>
+                  </div>
 
-    const executeProposal = async (proposalId) => {
-        try {
-            setExecuting(prev => ({ ...prev, [proposalId]: true }));
-            const signer = await getSigner();
-            const governorContract = await getGovernorContract(signer);
-
-            const tx = await governorContract.execute(proposalId);
-            console.log('Execute transaction submitted:', tx.hash);
-            await tx.wait();
-
-            await loadProposals();
-            alert('Proposal executed successfully!');
-        } catch (error) {
-            console.error('Failed to execute proposal:', error);
-            alert('Failed to execute proposal: ' + error.message);
-        } finally {
-            setExecuting(prev => ({ ...prev, [proposalId]: false }));
-        }
-    };
-
-    const calculateVotePercentages = (proposal) => {
-        const total = proposal.forVotes + proposal.againstVotes + proposal.abstainVotes;
-        if (total === 0) return { for: 0, against: 0, abstain: 0 };
-
-        return {
-            for: Math.round((proposal.forVotes / total) * 100),
-            against: Math.round((proposal.againstVotes / total) * 100),
-            abstain: Math.round((proposal.abstainVotes / total) * 100)
-        };
-    };
-
-    useEffect(() => {
-        loadProposals();
-    }, []);
-
-    return (
-        <div className="proposal-list">
-            <div className="proposal-header">
-                <h2>Governance Proposals</h2>
-                <p>Vote on active proposals that shape the future of the DAO</p>
-                <button onClick={loadProposals} disabled={loading} className="refresh-btn">
-                    {loading ? 'Loading...' : 'Refresh'}
-                </button>
-            </div>
-
-            <div className="proposals-grid">
-                {loading ? (
-                    <div className="loading">Loading proposals...</div>
-                ) : proposals.length === 0 ? (
-                    <div className="no-proposals">
-                        No proposals yet. Candidates need to be promoted to become proposals.
+                  <div className="voting-results">
+                    <div className="vote-bar">
+                      <div className="vote-section for" style={{ width: `${percentages.for}%` }}>
+                        <span>{percentages.for}% For ({proposal.forVotes})</span>
+                      </div>
+                      <div className="vote-section against" style={{ width: `${percentages.against}%` }}>
+                        <span>{percentages.against}% Against ({proposal.againstVotes})</span>
+                      </div>
+                      <div className="vote-section abstain" style={{ width: `${percentages.abstain}%` }}>
+                        <span>{percentages.abstain}% Abstain ({proposal.abstainVotes})</span>
+                      </div>
                     </div>
-                ) : (
-                    proposals.map((proposal) => {
-                        const percentages = calculateVotePercentages(proposal);
-                        const isActive = proposal.state === 1;
-                        const isSucceeded = proposal.state === 2;
-                        const canExecute = isSucceeded;
+                  </div>
+                </div>
 
-                        return (
-                            <div key={proposal.id} className={`proposal-card state-${proposal.state}`}>
-                                <div className="proposal-header">
-                                    <span className="proposal-id">Proposal #{proposal.id}</span>
-                                    <span className={`proposal-status status-${proposal.state}`}>
-                                        {PROPOSAL_STATES[proposal.state]}
-                                    </span>
-                                </div>
+                <div className="proposal-actions">
+                  {isActive && (
+                    <div className="voting-buttons">
+                      <button
+                        onClick={() => vote(proposal.id, 1)}
+                        disabled={voting[proposal.id]}
+                        className="vote-btn vote-for"
+                      >
+                        {voting[proposal.id] ? 'Voting...' : '✓ Vote For'}
+                      </button>
+                      <button
+                        onClick={() => vote(proposal.id, 0)}
+                        disabled={voting[proposal.id]}
+                        className="vote-btn vote-against"
+                      >
+                        {voting[proposal.id] ? 'Voting...' : '✗ Vote Against'}
+                      </button>
+                      <button
+                        onClick={() => vote(proposal.id, 2)}
+                        disabled={voting[proposal.id]}
+                        className="vote-btn vote-abstain"
+                      >
+                        {voting[proposal.id] ? 'Voting...' : '~ Abstain'}
+                      </button>
+                    </div>
+                  )}
 
-                                <div className="proposal-content">
-                                    <p className="description">{proposal.description}</p>
+                  {canExecute && (
+                    <button
+                      onClick={() => executeProposal(proposal.id)}
+                      disabled={executing[proposal.id]}
+                      className="execute-btn"
+                    >
+                      {executing[proposal.id] ? 'Executing...' : 'Execute Proposal'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
 
-                                    <div className="proposal-meta">
-                                        <small>Proposer: {proposal.proposer.slice(0, 6)}...{proposal.proposer.slice(-4)}</small>
-                                        <small>Blocks: {proposal.startBlock} → {proposal.endBlock}</small>
-                                    </div>
-
-                                    <div className="voting-results">
-                                        <div className="vote-bar">
-                                            <div className="vote-section for" style={{ width: `${percentages.for}%` }}>
-                                                <span>{percentages.for}% For ({proposal.forVotes})</span>
-                                            </div>
-                                            <div className="vote-section against" style={{ width: `${percentages.against}%` }}>
-                                                <span>{percentages.against}% Against ({proposal.againstVotes})</span>
-                                            </div>
-                                            <div className="vote-section abstain" style={{ width: `${percentages.abstain}%` }}>
-                                                <span>{percentages.abstain}% Abstain ({proposal.abstainVotes})</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="proposal-actions">
-                                    {isActive && (
-                                        <div className="voting-buttons">
-                                            <button
-                                                onClick={() => vote(proposal.id, 1)}
-                                                disabled={voting[proposal.id]}
-                                                className="vote-btn vote-for"
-                                            >
-                                                {voting[proposal.id] ? 'Voting...' : '✓ Vote For'}
-                                            </button>
-                                            <button
-                                                onClick={() => vote(proposal.id, 0)}
-                                                disabled={voting[proposal.id]}
-                                                className="vote-btn vote-against"
-                                            >
-                                                {voting[proposal.id] ? 'Voting...' : '✗ Vote Against'}
-                                            </button>
-                                            <button
-                                                onClick={() => vote(proposal.id, 2)}
-                                                disabled={voting[proposal.id]}
-                                                className="vote-btn vote-abstain"
-                                            >
-                                                {voting[proposal.id] ? 'Voting...' : '~ Abstain'}
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    {canExecute && (
-                                        <button
-                                            onClick={() => executeProposal(proposal.id)}
-                                            disabled={executing[proposal.id]}
-                                            className="execute-btn"
-                                        >
-                                            {executing[proposal.id] ? 'Executing...' : 'Execute Proposal'}
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })
-                )}
-            </div>
-
-            <style jsx>{`
+      <style jsx>{`
         .proposal-list {
           max-width: 900px;
           margin: 0 auto;
@@ -475,6 +492,6 @@ export default function ProposalList() {
           }
         }
       `}</style>
-        </div>
-    );
+    </div>
+  );
 }

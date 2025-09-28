@@ -385,8 +385,10 @@ export function validateContractAddresses() {
 /**
  * Export for use in components or console
  */
-export default {
+const contractChecker = {
     checkAllContracts,
     validateContractAddresses,
     CONTRACT_ADDRESSES
 };
+
+export default contractChecker;

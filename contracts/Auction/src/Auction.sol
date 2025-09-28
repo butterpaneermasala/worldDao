@@ -213,6 +213,7 @@ contract NFTAuction is IERC721Receiver, AutomationCompatibleInterface {
     event AuctionEnded(address indexed winner, uint256 amount);
     event Withdrawn(address indexed bidder, uint256 amount);
     event OperatorUpdated(address indexed operator);
+    event BeneficiaryUpdated(address indexed beneficiary);
 
     modifier onlyOperator() {
         require(msg.sender == operator, "Not operator");
@@ -228,6 +229,16 @@ contract NFTAuction is IERC721Receiver, AutomationCompatibleInterface {
     function setOperator(address _operator) external onlyOperator {
         operator = _operator;
         emit OperatorUpdated(_operator);
+    }
+
+    /// @notice Update the beneficiary address (only operator)
+    /// @param _beneficiary New beneficiary address to receive auction proceeds
+    function setBeneficiary(
+        address payable _beneficiary
+    ) external onlyOperator {
+        require(_beneficiary != address(0), "Invalid beneficiary");
+        beneficiary = _beneficiary;
+        emit BeneficiaryUpdated(_beneficiary);
     }
 
     // Start an auction for a given NFT that this contract must already own

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAccount } from 'wagmi';
@@ -41,17 +41,7 @@ export default function Bidding() {
     }
   }, [auctionEndTime]);
 
-  // Auto-refresh auction data
-  useEffect(() => {
-    loadAuctionData();
-
-    if (auctionActive) {
-      const interval = setInterval(loadAuctionData, 10000); // Every 10 seconds
-      return () => clearInterval(interval);
-    }
-  }, [auctionActive, address]);
-
-  const loadAuctionData = async () => {
+  const loadAuctionData = useCallback(async () => {
     try {
       const auctionAddress = process.env.NEXT_PUBLIC_AUCTION_ADDRESS;
       if (!auctionAddress) {
@@ -97,7 +87,17 @@ export default function Bidding() {
       console.error('Failed to load auction data:', err);
       setError(`Failed to load auction: ${err.message}`);
     }
-  };
+  }, [isConnected, address]);
+
+  // Auto-refresh auction data (reduced frequency to prevent rate limiting)
+  useEffect(() => {
+    loadAuctionData();
+
+    if (auctionActive) {
+      const interval = setInterval(loadAuctionData, 60000); // Every 60 seconds (reduced from 10s)
+      return () => clearInterval(interval);
+    }
+  }, [auctionActive, address, loadAuctionData]);
 
   const placeBid = async () => {
     if (!isConnected || !bidAmount) {
@@ -312,7 +312,7 @@ export default function Bidding() {
               <h4>🛡️ Auction Rules</h4>
               <ul>
                 <li>Bids must be higher than the current highest bid</li>
-                <li>You can withdraw your bid if you're not the highest bidder</li>
+                <li>You can withdraw your bid if you&apos;re not the highest bidder</li>
                 <li>The auction ends automatically at the specified time</li>
                 <li>Winner receives the NFT, seller receives the payment</li>
               </ul>

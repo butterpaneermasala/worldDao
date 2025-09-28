@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { AppContext } from '@/pages/_app';
 import { useAccount } from 'wagmi';
 import { getProvider, getSigner, getContract, getContractRPC, getRPCProvider } from '@/lib/web3';
@@ -35,7 +35,7 @@ export default function VotingGallery() {
 
             return () => clearInterval(interval);
         }
-    }, [phaseInfo.endTime, isVotingOpen]);
+    }, [phaseInfo.endTime, isVotingOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Auto-refresh during voting
     useEffect(() => {
@@ -46,12 +46,12 @@ export default function VotingGallery() {
 
             return () => clearInterval(interval);
         }
-    }, [isVotingOpen]);
+    }, [isVotingOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Initial load
     useEffect(() => {
         initializeVoting();
-    }, []);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const initializeVoting = async () => {
         setLoading(true);

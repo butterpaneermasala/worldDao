@@ -3,9 +3,10 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {NFTMinter} from "../src/NFTMinter.sol";
-import {Voting} from "../src/Voting.sol";
+import {Voting, ITreasury} from "../src/Voting.sol";
 import {NFTAuction} from "../src/NFTAuction.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {MockTreasury} from "./mocks/MockTreasury.sol";
 
 contract VotingAuctionTest is Test {
     // Actors
@@ -47,12 +48,21 @@ contract VotingAuctionTest is Test {
         vm.prank(deployer);
         minter = new NFTMinter("DailyNFT", "DNFT", deployer);
 
+        // Deploy mock treasury
+        vm.prank(deployer);
+        MockTreasury treasury = new MockTreasury(deployer);
+
         // Auction operator initially deployer; will be switched to Voting later
         vm.prank(deployer);
         auction = new NFTAuction(deployer, payable(beneficiary));
 
         vm.prank(deployer);
-        voting = new Voting(minter, auction, pngs);
+        voting = new Voting(
+            minter,
+            auction,
+            ITreasury(address(treasury)),
+            pngs
+        );
 
         // Transfer minter ownership to voting so it can mint at finalize
         vm.prank(deployer);
@@ -168,7 +178,9 @@ contract VotingAuctionTest is Test {
 
     // -------- Mega end-to-end flow --------
 
-    function testMega_EndToEnd_DailyVotingThenNextDayAuctionAndFinalize() public {
+    function testMega_EndToEnd_DailyVotingThenNextDayAuctionAndFinalize()
+        public
+    {
         // First transition to Voting phase
         uint256 end = voting.currentDayEndIST();
         vm.warp(end + 1);
@@ -181,11 +193,16 @@ contract VotingAuctionTest is Test {
         voting.voteIndex(5);
         // End of day 1
         vm.warp(voting.currentDayEndIST());
-        uint256 beforeMintBalance = IERC721(address(minter)).balanceOf(address(voting));
+        uint256 beforeMintBalance = IERC721(address(minter)).balanceOf(
+            address(voting)
+        );
         voting.performUpkeep("");
         // After finalize: NFT minted to voting, then transferred to auction and auction started
         assertTrue(auction.auctionActive());
-        assertEq(IERC721(address(minter)).balanceOf(address(voting)), beforeMintBalance); // transferred out
+        assertEq(
+            IERC721(address(minter)).balanceOf(address(voting)),
+            beforeMintBalance
+        ); // transferred out
         assertEq(IERC721(address(minter)).ownerOf(0), address(auction));
 
         // Day 2: place bids

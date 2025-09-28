@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { AppContext } from '@/pages/_app';
 import { useAccount } from 'wagmi';
@@ -44,7 +44,7 @@ export default function AuctionResults() {
     // Auto-refresh auction data
     useEffect(() => {
         if (auctionActive) {
-            const interval = setInterval(loadAuctionData, 15000); // Every 15 seconds
+            const interval = setInterval(loadAuctionData, 120000); // Every 2 minutes (reduced from 15s)
             return () => clearInterval(interval);
         }
     }, [auctionActive]);
@@ -52,7 +52,8 @@ export default function AuctionResults() {
     // Initial load
     useEffect(() => {
         loadData();
-    }, [items]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const loadData = async () => {
         setLoading(true);
